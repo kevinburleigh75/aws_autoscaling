@@ -10,9 +10,23 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 0) do
+ActiveRecord::Schema.define(version: 20170801210141) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "protocol_records", force: :cascade do |t|
+    t.string "protocol_name", null: false
+    t.uuid "group_uuid", null: false
+    t.uuid "instance_uuid", null: false
+    t.integer "instance_count", null: false
+    t.integer "instance_modulo", null: false
+    t.uuid "boss_uuid", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
+    t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
+    t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
+  end
 
 end
