@@ -1,0 +1,5 @@
+{
+  "name": "aws_autoscaling",
+  "private": true,
+  "dependencies": {}
+}
