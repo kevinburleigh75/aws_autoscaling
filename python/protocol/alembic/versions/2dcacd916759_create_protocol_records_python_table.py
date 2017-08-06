@@ -7,7 +7,7 @@ Create Date: 2017-08-03 08:28:14.104102
 """
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.sql import func
+from sqlalchemy.sql import (func, text)
 
 from sqlalchemy.dialects.postgresql import UUID as sa_uuid
 
@@ -28,8 +28,8 @@ def upgrade():
         sa.Column('instance_count',  sa.Integer,                   nullable    = False),
         sa.Column('instance_modulo', sa.Integer,                   nullable    = False),
         sa.Column('boss_uuid',       sa_uuid,                      nullable    = False),
-        sa.Column('created_at',      sa.DateTime(timezone=True),   nullable    = False, server_default = func.now()),
-        sa.Column('updated_at',      sa.DateTime(timezone=True),   nullable    = False, server_default = func.now(), onupdate = func.now()),
+        sa.Column('created_at',      sa.DateTime(timezone=True),   nullable    = False),
+        sa.Column('updated_at',      sa.DateTime(timezone=True),   nullable    = False),
     )
 
     op.create_index(
