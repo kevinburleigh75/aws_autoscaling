@@ -49,6 +49,7 @@ def upgrade():
         index_name = 'index_protocol_records_on_instance_uuid',
         table_name = 'protocol_records_python',
         columns    = ['instance_uuid'],
+        unique     = True,
     )
 
 def downgrade():
