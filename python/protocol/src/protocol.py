@@ -223,6 +223,7 @@ class Protocol:
         except Exception as ex:
             raise ex
         finally:
+            self.session.rollback()
             my_records = self.session.query(ProtocolRecord) \
                                      .filter_by(c_instance_uuid = self.instance_uuid) \
                                      .all()
