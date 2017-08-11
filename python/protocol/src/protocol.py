@@ -114,6 +114,9 @@ class Protocol:
         self.session_class     = session_class
         self.instance_uuid     = str(uuid.uuid4())
 
+        self.record_timeout     = datetime.timedelta(seconds=2)
+        self.max_sleep_interval = datetime.timedelta(seconds=0.25)
+
 
     def _compute_next_work_time(self, last_time, current_time, instance_count, instance_modulo):
         if last_time is None:
@@ -135,39 +138,60 @@ class Protocol:
             self.session = self.session_class()
 
             while True:
+                ##
+                ## Read group records, and create one for this instance
+                ## if not already present.
+                ##
+
                 my_record, group_records, dead_records = self._read_records()
                 if my_record is None:
                     print('create!')
                     self._create_record()
                     continue
 
-                am_boss, boss_record = self._get_boss_situation(group_records)
-                # print('-' * 20)
-                # print('my_record   = {}'.format(my_record))
-                # print('boss_record = {}'.format(boss_record))
-                # print('am_boss     = {}'.format(am_boss))
+                ##
+                ## Figure out who the boss is, and have an election if none.
+                ##
 
+                am_boss, boss_record = self._get_boss_situation(group_records)
                 if boss_record is None:
                     print('elect!')
                     self._elect_new_boss(my_record, group_records)
                     continue
 
+                ##
+                ## If not the boss, stop doing boss work.
+                ##
+
                 if not am_boss:
                     next_boss_time = None
+
+                ##
+                ## Update group parameters and re-save the record for this instance.
+                ## (This information is used for elections.)
+                ##
 
                 my_record.c_boss_uuid      = boss_record.c_boss_uuid
                 my_record.c_instance_count = len(group_records)
                 self._save_record(my_record)
+
+                ##
+                ## If this instance is boss and there are dead records, clean them up.
+                ##
 
                 if am_boss and (0 != len(dead_records)):
                     print('destroy!')
                     self._destroy_dead_records(dead_records)
                     continue
 
+                ##
+                ## Determine the set of valid instance modulos.  If there is a discrepancy
+                ## and the modulo for this instance is out of range, set it to a valid
+                ## value.
+                ##
+
                 actual_modulos = sorted(list(map(lambda rec: rec.c_instance_modulo, group_records)))
                 target_modulos = sorted(list(range(boss_record.c_instance_count)))
-                # print('actual_modulos = {}'.format(sorted(actual_modulos)))
-                # print('target_modulos = {}'.format(sorted(target_modulos)))
 
                 if actual_modulos != target_modulos:
                     print('allocate needed!')
@@ -176,6 +200,12 @@ class Protocol:
                         self._allocate_modulo(my_record, group_records)
                     time.sleep(0.1)
                     continue
+
+                ##
+                ## If this instance is boss, and either boss work is overdue or has
+                ## never been done, do boss work and determine the time for the
+                ## next boss work.
+                ##
 
                 current_time = datetime.datetime.now(datetime.timezone.utc)
 
@@ -187,6 +217,11 @@ class Protocol:
                         instance_modulo = my_record.c_instance_modulo,
                     )
 
+                ##
+                ## If work has never been done or instance counts/modulos have changed,
+                ## determine the time next work time.
+                ##
+
                 if ( (next_work_time is None) or (my_record.c_instance_modulo != prev_instance_modulo) or (boss_record.c_instance_count != prev_instance_count) ):
                     next_work_time = self._compute_next_work_time(
                         last_time       = None,
@@ -196,6 +231,11 @@ class Protocol:
                     )
                     prev_instance_count  = boss_record.c_instance_count
                     prev_instance_modulo = my_record.c_instance_modulo
+
+                ##
+                ## If work is overdue, do it and determine the next work time.
+                ## Otherwise, sleep for a while.
+                ##
 
                 if current_time >= next_work_time:
                     self.work_block(
@@ -213,16 +253,21 @@ class Protocol:
                         instance_modulo = my_record.c_instance_modulo,
                     )
                 else:
+                    ## Sleep until the next work time, boss time (if appropriate), or
+                    ## small maximum amount, whichever is smallest.
+                    intervals = [self.max_sleep_interval, next_work_time - current_time]
                     if am_boss:
-                        sleep_interval = min([datetime.timedelta(seconds=0.5), next_work_time - current_time, next_boss_time - current_time]).total_seconds()
-                    else:
-                        sleep_interval = min([datetime.timedelta(seconds=0.5), next_work_time - current_time]).total_seconds()
-                    time.sleep(sleep_interval)
+                        intervals.append(next_boss_time - current_time)
+                    time.sleep(min(intervals).total_seconds())
         except KeyboardInterrupt as ex:
             print('exiting')
         except Exception as ex:
             raise ex
         finally:
+            ##
+            ## Cleanup the record for this instance before exiting.
+            ##
+
             self.session.rollback()
             my_records = self.session.query(ProtocolRecord) \
                                      .filter_by(c_instance_uuid = self.instance_uuid) \
@@ -238,7 +283,7 @@ class Protocol:
                                   .all()
 
         current_time = datetime.datetime.now(datetime.timezone.utc)
-        delta_time   = datetime.timedelta(seconds=10)
+        delta_time   = datetime.timedelta(seconds=2)
 
         group_records = list(filter(lambda rec: rec.c_updated_at > current_time - delta_time, all_records))
         dead_records  = list(set(all_records) - set(group_records))
