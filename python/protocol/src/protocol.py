@@ -313,6 +313,7 @@ class Protocol:
                 break
 
             except Exception as ex:
+                self.session.rollback()
                 retries += 1
                 print('retrying ({}): {}'.format(retries, ex))
                 if retries >= 20:
@@ -367,11 +368,14 @@ class Protocol:
 
         for target_modulo in available_modulos:
             try:
+                print('   trying modulo = {}'.format(target_modulo))
                 my_record.c_instance_modulo = target_modulo
                 my_record.c_instance_count  = len(group_records)
                 self._save_record(my_record)
                 break
             except Exception as ex:
+                print('   modulo already taken')
+                self.session.rollback()
                 time.sleep(0.1)
 
         time.sleep(0.1)
@@ -382,13 +386,16 @@ class Protocol:
         self.session.commit()
 
 
+import os
 class Worker:
+
     def __init__(self):
         pass
 
     def do_work(self, instance_uuid, instance_count, instance_modulo, am_boss):
-        print('{} {} {:02d}/{:02d} {} doing work'.format(
+        print('{} {:d} {} {:02d}/{:02d} {} doing work'.format(
             datetime.datetime.now(),
+            os.getpid(),
             instance_uuid,
             instance_modulo,
             instance_count,
@@ -396,8 +403,9 @@ class Worker:
         ))
 
     def do_boss(self, instance_uuid, instance_count, instance_modulo):
-        print('{} {} {:02d}/{:02d} doing boss'.format(
+        print('{} {:d} {} {:02d}/{:02d} doing boss'.format(
             datetime.datetime.now(),
+            os.getpid(),
             instance_uuid,
             instance_modulo,
             instance_count,
