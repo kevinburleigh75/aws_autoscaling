@@ -6,13 +6,13 @@ class Worker
 
   def do_work(count:, modulo:, am_boss:)
     @counter += 1
-    puts "#{Time.now.utc.iso8601(6)} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
-    sleep(0.05)
+    puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+    # sleep(0.05)
   end
 
   def do_boss(count:, modulo:)
-    puts "doing boss things"
-    sleep(0.1)
+    puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    # sleep(0.05)
   end
 end
 

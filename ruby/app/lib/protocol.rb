@@ -33,7 +33,7 @@ class Protocol
     ActiveRecord::Base.clear_active_connections!
 
     # current_time = Time.now
-    last_boss_time       = nil
+    next_boss_time       = nil
     next_work_time       = nil
     prev_instance_count  = nil
     prev_instance_modulo = nil
@@ -56,7 +56,7 @@ class Protocol
       end
 
       if not am_boss
-        last_boss_time = nil
+        next_boss_time = nil
       end
 
       my_record.boss_uuid      = boss_record.instance_uuid
@@ -87,8 +87,8 @@ class Protocol
 
       current_time = Time.now
 
-      if am_boss && (last_boss_time.nil? || current_time - last_boss_time >= @min_boss_interval)
-        last_boss_time = current_time
+      if am_boss && (next_boss_time.nil? || current_time >= next_boss_time)
+        next_boss_time = current_time + @min_boss_interval
         @boss_block.call(
           instance_count:  boss_record.instance_count,
           instance_modulo: my_record.instance_modulo,
@@ -125,9 +125,9 @@ class Protocol
         )
         # puts "next_work_time: #{round_time(time: next_work_time).utc.iso8601(6)}"
       else
-        sleep_interval = [0.5, next_work_time - current_time].min
-        # puts "sleeping for #{sleep_interval}"
-        sleep(sleep_interval)
+        intervals = [0.25.seconds, next_work_time - current_time]
+        intervals << next_boss_time - current_time if am_boss
+        sleep(intervals.min)
       end
     end
   rescue Interrupt => ex
@@ -189,7 +189,7 @@ class Protocol
       ProtocolRecord.where(group_uuid: @group_uuid).to_a
     end
 
-    group_records = all_records.select{|rec| rec.updated_at > Time.now - 10.seconds}
+    group_records = all_records.select{|rec| rec.updated_at > Time.now - 2.seconds}
     dead_records  = all_records - group_records
     my_record     = all_records.detect{|rec| rec.instance_uuid == @instance_uuid}
 
