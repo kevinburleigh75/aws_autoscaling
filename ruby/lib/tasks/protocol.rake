@@ -7,7 +7,23 @@ class Worker
   def do_work(count:, modulo:, am_boss:)
     @counter += 1
     puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
-    # sleep(0.05)
+
+    start = Time.now
+
+    num_records = 1000
+    uuids = num_records.times.map{ SecureRandom.uuid.to_s }
+    exper_records = uuids.map{|uuid| ExperRecord.new(uuid: uuid)}
+    # exper_records.map{|exper_record| puts exper_record.inspect}
+
+    ActiveRecord::Base.connection_pool.with_connection do
+      # ExperRecord.transaction(isolation: :serializable) do
+      ExperRecord.transaction(isolation: :repeatable_read) do
+        exper_records.map(&:save!)
+      end
+    end
+
+    elapsed = Time.now - start
+    puts "   wrote #{num_records} records in #{'%1.3e' % elapsed} sec"
   end
 
   def do_boss(count:, modulo:)

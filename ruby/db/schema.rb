@@ -10,10 +10,17 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20170801210141) do
+ActiveRecord::Schema.define(version: 20170822121536) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "exper_records", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["uuid"], name: "index_exper_records_on_uuid"
+  end
 
   create_table "protocol_records", force: :cascade do |t|
     t.string "protocol_name", null: false
