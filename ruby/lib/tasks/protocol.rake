@@ -10,17 +10,29 @@ class Worker
 
     start = Time.now
 
-    num_records = 1000
-    uuids = num_records.times.map{ SecureRandom.uuid.to_s }
-    exper_records = uuids.map{|uuid| ExperRecord.new(uuid: uuid)}
-    # exper_records.map{|exper_record| puts exper_record.inspect}
-
-    ActiveRecord::Base.connection_pool.with_connection do
+    num_records = 100
+    # uuids = num_records.times.map{ SecureRandom.uuid.to_s }
+    # ActiveRecord::Base.connection_pool.with_connection do
       # ExperRecord.transaction(isolation: :serializable) do
       ExperRecord.transaction(isolation: :repeatable_read) do
-        exper_records.map(&:save!)
+        num_records.times.map do
+          ExperRecord.create!(
+            uuid:  SecureRandom.uuid,
+            uuid1: SecureRandom.uuid,
+            uuid2: SecureRandom.uuid,
+            uuid3: SecureRandom.uuid,
+            uuid4: SecureRandom.uuid,
+            uuid5: SecureRandom.uuid,
+            uuid6: SecureRandom.uuid,
+            uuid7: SecureRandom.uuid,
+            uuid8: SecureRandom.uuid,
+            uuid9: SecureRandom.uuid,
+          )
+        end
+        # uuids.map{|uuid| ExperRecord.create!(uuid: uuid)}
+        # exper_records.map(&:save!)
       end
-    end
+    # end
 
     elapsed = Time.now - start
     puts "   wrote #{num_records} records in #{'%1.3e' % elapsed} sec"

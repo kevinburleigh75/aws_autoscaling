@@ -17,6 +17,15 @@ ActiveRecord::Schema.define(version: 20170822121536) do
 
   create_table "exper_records", force: :cascade do |t|
     t.uuid "uuid", null: false
+    t.uuid "uuid1", null: false
+    t.uuid "uuid2", null: false
+    t.uuid "uuid3", null: false
+    t.uuid "uuid4", null: false
+    t.uuid "uuid5", null: false
+    t.uuid "uuid6", null: false
+    t.uuid "uuid7", null: false
+    t.uuid "uuid8", null: false
+    t.uuid "uuid9", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["uuid"], name: "index_exper_records_on_uuid"
