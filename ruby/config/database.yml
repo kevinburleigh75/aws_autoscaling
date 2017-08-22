@@ -21,5 +21,8 @@ test:
 production:
   <<: *default
   encoding: unicode
-  username: aws_autoscaling
-  database: aws_autoscaling_prod
+  host:     rds-access-exper.cl8wqujzulmc.us-west-2.rds.amazonaws.com
+  port:     5432
+  username: accessmaster
+  password: accesspassword
+  database: rds_access_exper_db
