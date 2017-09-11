@@ -198,6 +198,8 @@ class Protocol
 
 
   def _get_boss_situation(group_records)
+    return [false, nil] if group_records.empty?
+
     uuid, votes = group_records.group_by(&:boss_uuid)
                                .inject({}){|result, (uuid, group)|
                                   result[uuid] = group.size

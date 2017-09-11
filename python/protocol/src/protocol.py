@@ -321,6 +321,9 @@ class Protocol:
 
 
     def _get_boss_situation(self, group_records):
+        if len(group_records) == 0:
+            return False, None
+
         records_by_boss_uuid      = itertools.groupby(group_records, lambda rec: rec.c_boss_uuid)
         count_by_boss_uuid        = {kk: len(list(vv)) for kk,vv in records_by_boss_uuid}
         sorted_count_by_boss_uuid = list(reversed(sorted(count_by_boss_uuid.items(), key=lambda kvpair: kvpair[1])))
