@@ -21,8 +21,8 @@ test:
 production:
   <<: *default
   encoding: unicode
-  host:     rds-access-exper.cl8wqujzulmc.us-west-2.rds.amazonaws.com
+  host:     dbcluster.cluster-cq28zltnxqai.us-east-1.rds.amazonaws.com
   port:     5432
-  username: accessmaster
-  password: accesspassword
-  database: rds_access_exper_db
+  username: masteruser
+  password: masterpassword
+  database: dbname
