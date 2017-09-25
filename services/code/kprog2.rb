@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 
 counter = 0
-File::open('/home/ubuntu/log1.txt', 'a') do |fh|
+File::open('/home/ubuntu/log2.txt', 'a') do |fh|
   loop do
     fh.write("#{Time.now} #{counter}\n")
     fh.flush
