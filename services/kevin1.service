@@ -1,0 +1,15 @@
+[Unit]
+Description=Kevin's Custom Service 1
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/home/ubuntu/.rvm/rubies/ruby-2.3.1/bin/ruby /home/ubuntu/aws_autoscaling/services/code/kprog1.rb
+Restart=on-abort
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
