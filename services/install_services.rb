@@ -1,5 +1,7 @@
 #!/usr/bin/env ruby
 
+require 'fileutils'
+
 services_source_dirname = ARGV[0]
 services_target_dirname = ARGV[1]
 
