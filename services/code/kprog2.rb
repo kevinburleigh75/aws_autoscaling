@@ -6,6 +6,6 @@ File::open('/home/ubuntu/log2.txt', 'a') do |fh|
     fh.write("#{Time.now} #{counter}\n")
     fh.flush
     counter += 1
-    sleep(1.0)
+    sleep(0.5)
   end
 end

@@ -1,5 +1,5 @@
 [Unit]
-Description=Kevin's Custom Service 1
+Description=Kevin's Custom Service 2
 After=network.target
 
 [Service]

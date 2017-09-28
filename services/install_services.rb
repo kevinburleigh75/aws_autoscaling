@@ -16,7 +16,8 @@ Dir.foreach(services_source_dirname) do |filename|
   if matches = filename.match(%r{^(.*/)*(?<service_name>.*)\.service$})
     service_name = matches[:service_name]
     next unless service_name.match(%r/^#{service_prefix}/)
-    puts "disabling #{service_name}"
+    puts "stopping/disabling #{service_name}"
+    system("systemctl stop #{service_name}")
     system("systemctl disable #{service_name}")
     FileUtils.rm_f(services_target_dirname + '/' + service_name + '.service')
   end
