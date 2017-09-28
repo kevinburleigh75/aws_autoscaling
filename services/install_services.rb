@@ -16,6 +16,7 @@ Dir.foreach(services_source_dirname) do |filename|
   if matches = filename.match(%r{^(.*/)*(?<service_name>.*)\.service$})
     service_name = matches[:service_name]
     next unless service_name.match(%r/^#{service_prefix}/)
+    puts "disabling #{service_name}"
     system("systemctl disable #{service_name}")
     FileUtils.rm_f(services_target_dirname + '/' + service_name + '.service')
   end
@@ -29,8 +30,7 @@ Dir.foreach(services_source_dirname) do |filename|
   puts("filename = #{filename}")
   if matches = filename.match(%r{^(.*/)*(?<service_name>.*)\.service$})
     service_name = matches[:service_name]
-    puts("  service_name = #{service_name}")
-
+    puts("copying #{service_name}")
     FileUtils.cp(filename, services_target_dirname)
   end
 end
@@ -40,6 +40,7 @@ end
 ##
 
 enabled_services.each do |service_name|
+  puts "enabling #{service_name}"
   system("systemctl enable #{service_name}")
   system("systemctl restart #{service_name}")
 end
