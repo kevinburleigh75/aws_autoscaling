@@ -4,7 +4,7 @@ counter = 0
 File::open('/home/ubuntu/log2.txt', 'a') do |fh|
   fh.write("#{Time.now} #{ENV['ASG_DB_ENDPOINT']}\n")
   fh.write("#{Time.now} #{ENV['ASG_DB_PORT']}\n")
-  fh.write("#{Time.now} #{ENV['ASG_MASTER_USERNAME']}\n")
+  fh.write("#{Time.now} #{ENV['ASG_DB_MASTER_USERNAME']}\n")
   fh.flush
 
   loop do
