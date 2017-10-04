@@ -2,9 +2,10 @@
 
 counter = 0
 File::open('/home/ubuntu/log2.txt', 'a') do |fh|
-  fh.write{"#{Time.now} #{ENV['ASG_DB_ENDPOINT']}"}
-  fh.write{"#{Time.now} #{ENV['ASG_DB_PORT']}"}
-  fh.write{"#{Time.now} #{ENV['ASG_MASTER_USERNAME']}"}
+  fh.write("#{Time.now} #{ENV['ASG_DB_ENDPOINT']}\n")
+  fh.write("#{Time.now} #{ENV['ASG_DB_PORT']}\n")
+  fh.write("#{Time.now} #{ENV['ASG_MASTER_USERNAME']}\n")
+  fh.flush
 
   loop do
     fh.write("#{Time.now} #{counter}\n")
