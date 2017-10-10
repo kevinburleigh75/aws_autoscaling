@@ -21,8 +21,8 @@ test:
 production:
   <<: *default
   encoding: unicode
-  host:     dbcluster.cluster-cq28zltnxqai.us-east-1.rds.amazonaws.com
-  port:     5432
-  username: masteruser
-  password: masterpassword
-  database: dbname
+  host:     <%= ENV.fetch("ASG_DB_ENDPOINT") %>
+  port:     <%= ENV.fetch("ASG_DB_PORT") %>
+  username: <%= ENV.fetch("ASG_DB_MASTER_USERNAME") %>
+  password: <%= ENV.fetch("ASG_DB_MASTER_PASSWORD") %>
+  database: <%= ENV.fetch("ASG_DB_NAME") %>
