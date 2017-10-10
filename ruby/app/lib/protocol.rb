@@ -189,7 +189,7 @@ class Protocol
       ProtocolRecord.where(group_uuid: @group_uuid).to_a
     end
 
-    group_records = all_records.select{|rec| rec.updated_at > Time.now - 2.seconds}
+    group_records = all_records.select{|rec| rec.updated_at > Time.now - 10.seconds}
     dead_records  = all_records - group_records
     my_record     = all_records.detect{|rec| rec.instance_uuid == @instance_uuid}
 
