@@ -6,7 +6,7 @@ class Worker
 
   def do_work(count:, modulo:, am_boss:)
     @counter += 1
-    puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
 
     start = Time.now
 
@@ -35,11 +35,11 @@ class Worker
     # end
 
     elapsed = Time.now - start
-    puts "   wrote #{num_records} records in #{'%1.3e' % elapsed} sec"
+    Rails.logger.info "   wrote #{num_records} records in #{'%1.3e' % elapsed} sec"
   end
 
   def do_boss(count:, modulo:)
-    puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
     # sleep(0.05)
   end
 end

@@ -21,8 +21,8 @@ test:
 production:
   <<: *default
   encoding: unicode
-  host:     <%= ENV.fetch("ASG_DB_ENDPOINT") %>
-  port:     <%= ENV.fetch("ASG_DB_PORT") %>
-  username: <%= ENV.fetch("ASG_DB_MASTER_USERNAME") %>
-  password: <%= ENV.fetch("ASG_DB_MASTER_PASSWORD") %>
-  database: <%= ENV.fetch("ASG_DB_NAME") %>
+  host:     <%= ENV['ASG_DB_ENDPOINT'] %>
+  port:     <%= ENV['ASG_DB_PORT'] %>
+  username: <%= ENV['ASG_DB_MASTER_USERNAME'] %>
+  password: <%= ENV['ASG_DB_MASTER_PASSWORD'] %>
+  database: <%= ENV['ASG_DB_NAME'] %>
