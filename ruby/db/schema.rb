@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20170822121536) do
+ActiveRecord::Schema.define(version: 20171012134937) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -43,6 +43,25 @@ ActiveRecord::Schema.define(version: 20170822121536) do
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
     t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
+  end
+
+  create_table "request_records", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.integer "partition_value", null: false
+    t.boolean "has_been_processed", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_request_records_on_created_at"
+    t.index ["has_been_processed"], name: "index_request_records_on_has_been_processed"
+    t.index ["uuid"], name: "index_request_records_on_uuid"
+  end
+
+  create_table "response_records", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_response_records_on_created_at"
+    t.index ["uuid"], name: "index_response_records_on_uuid"
   end
 
 end
