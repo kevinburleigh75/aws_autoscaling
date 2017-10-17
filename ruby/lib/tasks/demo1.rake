@@ -1,0 +1,106 @@
+class ResponseCalcWorker
+  def initialize(group_uuid:,
+                 num_learners:,
+                 responses_per_iter:,
+                 start_date:,
+                 end_date:)
+    @group_uuid         = group_uuid
+    @counter            = 0
+    @num_learners       = num_learners
+    @responses_per_iter = responses_per_iter
+    @start_date         = start_date
+    @end_date           = end_date
+
+    @learner_uuids   = @num_learners.times.map{ SecureRandom.uuid }
+    @ecosystem_uuids = 10.times.map{ SecureRandom.uuid }
+  end
+
+  def do_work(count:, modulo:, am_boss:)
+    Rails.logger.level = :info
+
+    @counter += 1
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+
+    start = Time.now
+
+    learner_uuids = @responses_per_iter.times.map{ @learner_uuids.sample }
+
+    learner_responses = learner_uuids.map{ |learner_uuid|
+      random_time = Time.at(@start_date + rand * (@end_date.to_f - @start_date.to_f))
+
+      LearnerResponse.new(
+        uuid:           SecureRandom.uuid,
+        ecosystem_uuid: @ecosystem_uuids.sample,
+        learner_uuid:   learner_uuid,
+        question_uuid:  SecureRandom.uuid,
+        trial_uuid:     SecureRandom.uuid,
+        was_correct:    [true, false].sample,
+        responded_at:   random_time,
+      )
+    }
+
+    LearnerResponse.transaction(isolation: :repeatable_read) do
+      LearnerResponse.import(learner_responses)
+    end
+
+    calc_requests = learner_uuids.uniq.map{ |learner_uuid|
+      CalcRequest.new(
+        uuid:               SecureRandom.uuid,
+        ecosystem_uuid:     @ecosystem_uuids.sample,
+        learner_uuid:       learner_uuid,
+        has_been_processed: false,
+      )
+    }
+
+    CalcRequest.transaction(isolation: :repeatable_read) do
+      CalcRequest.import calc_requests
+    end
+
+    elapsed = Time.now - start
+    Rails.logger.info "   wrote #{learner_responses.size} + #{calc_requests.size} records in #{'%1.3e' % elapsed} sec"
+  end
+
+  def do_boss(count:, modulo:)
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    # sleep(0.05)
+  end
+end
+
+namespace :demo1 do
+  desc "Join the 'exper' protocol group"
+  task :response_calc, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
+    group_uuid    = args[:group_uuid]
+    work_interval = (args[:work_interval] || '1.0').to_f.seconds
+    boss_interval = 5.seconds
+    work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
+    work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
+
+    start_date = Chronic.parse('2017-01-01 12:00')
+    end_date   = Chronic.parse('2017-12-01 12:00')
+
+    worker = ResponseCalcWorker.new(
+      group_uuid:         group_uuid,
+      num_learners:       1000,
+      responses_per_iter: 10,
+      start_date:         start_date,
+      end_date:           end_date,
+    )
+
+    protocol = Protocol.new(
+      protocol_name:      'exper',
+      min_work_interval:  work_interval,
+      min_boss_interval:  boss_interval,
+      work_modulo:        work_modulo,
+      work_offset:        work_offset,
+      group_uuid:         group_uuid,
+      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
+                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
+                  },
+      boss_block: lambda { |instance_count:, instance_modulo:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+                  }
+    )
+
+    protocol.run
+  end
+end

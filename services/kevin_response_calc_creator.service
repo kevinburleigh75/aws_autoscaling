@@ -1,12 +1,12 @@
 [Unit]
-Description=Kevin's Custom Service 1
+Description=Kevin's Response/Calc Creator Service
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_rails_task_1.sh
+ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_response_calc_creator.sh
 Restart=on-abort
 KillSignal=SIGINT
 TimeoutStopSec=5

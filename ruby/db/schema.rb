@@ -10,10 +10,40 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171012134937) do
+ActiveRecord::Schema.define(version: 20171017133149) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "calc_requests", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.uuid "ecosystem_uuid", null: false
+    t.uuid "learner_uuid", null: false
+    t.boolean "has_been_processed", null: false
+    t.datetime "processed_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_calc_requests_on_created_at"
+    t.index ["has_been_processed"], name: "index_calc_requests_on_has_been_processed"
+    t.index ["learner_uuid", "ecosystem_uuid"], name: "index_calc_requests_on_learner_uuid_and_ecosystem_uuid"
+    t.index ["learner_uuid"], name: "index_calc_requests_on_learner_uuid"
+    t.index ["uuid"], name: "index_calc_requests_on_uuid", unique: true
+  end
+
+  create_table "calc_results", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.uuid "calc_request_uuid", null: false
+    t.uuid "ecosystem_uuid", null: false
+    t.uuid "learner_uuid", null: false
+    t.boolean "has_been_reported", null: false
+    t.datetime "reported_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["calc_request_uuid"], name: "index_calc_results_on_calc_request_uuid", unique: true
+    t.index ["created_at"], name: "index_calc_results_on_created_at"
+    t.index ["has_been_reported"], name: "index_calc_results_on_has_been_reported"
+    t.index ["uuid"], name: "index_calc_results_on_uuid", unique: true
+  end
 
   create_table "exper_records", force: :cascade do |t|
     t.uuid "uuid", null: false
@@ -31,6 +61,22 @@ ActiveRecord::Schema.define(version: 20171012134937) do
     t.index ["uuid"], name: "index_exper_records_on_uuid"
   end
 
+  create_table "learner_responses", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.uuid "ecosystem_uuid", null: false
+    t.uuid "learner_uuid", null: false
+    t.uuid "question_uuid", null: false
+    t.uuid "trial_uuid", null: false
+    t.boolean "was_correct", null: false
+    t.datetime "responded_at", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_learner_responses_on_created_at"
+    t.index ["learner_uuid"], name: "index_learner_responses_on_learner_uuid"
+    t.index ["question_uuid"], name: "index_learner_responses_on_question_uuid"
+    t.index ["uuid"], name: "index_learner_responses_on_uuid", unique: true
+  end
+
   create_table "protocol_records", force: :cascade do |t|
     t.string "protocol_name", null: false
     t.uuid "group_uuid", null: false
@@ -43,25 +89,6 @@ ActiveRecord::Schema.define(version: 20171012134937) do
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
     t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
-  end
-
-  create_table "request_records", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.integer "partition_value", null: false
-    t.boolean "has_been_processed", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_request_records_on_created_at"
-    t.index ["has_been_processed"], name: "index_request_records_on_has_been_processed"
-    t.index ["uuid"], name: "index_request_records_on_uuid"
-  end
-
-  create_table "response_records", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_response_records_on_created_at"
-    t.index ["uuid"], name: "index_response_records_on_uuid"
   end
 
 end
