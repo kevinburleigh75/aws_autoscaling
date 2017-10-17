@@ -46,6 +46,7 @@ class ResponseCalcWorker
     calc_requests = learner_uuids.uniq.map{ |learner_uuid|
       CalcRequest.new(
         uuid:               SecureRandom.uuid,
+        partition_value:    Kernel.rand(1*2*3*4*5*6*7*8*9*10),
         ecosystem_uuid:     @ecosystem_uuids.sample,
         learner_uuid:       learner_uuid,
         has_been_processed: false,
@@ -67,7 +68,7 @@ class ResponseCalcWorker
 end
 
 namespace :demo1 do
-  desc "Join the 'exper' protocol group"
+  desc "Create LearnerResponses and CalcRequests"
   task :response_calc, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '1.0').to_f.seconds
@@ -84,6 +85,92 @@ namespace :demo1 do
       responses_per_iter: 10,
       start_date:         start_date,
       end_date:           end_date,
+    )
+
+    protocol = Protocol.new(
+      protocol_name:      'exper',
+      min_work_interval:  work_interval,
+      min_boss_interval:  boss_interval,
+      work_modulo:        work_modulo,
+      work_offset:        work_offset,
+      group_uuid:         group_uuid,
+      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
+                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
+                  },
+      boss_block: lambda { |instance_count:, instance_modulo:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+                  }
+    )
+
+    protocol.run
+  end
+end
+
+
+class CalcWorker
+  def initialize(group_uuid:)
+    @group_uuid = group_uuid
+    @counter    = 0
+  end
+
+  def do_work(count:, modulo:, am_boss:)
+    Rails.logger.level = :info
+
+    @counter += 1
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+
+    start = Time.now
+
+    sql_calc_records_to_process = %Q{
+      SELECT cr.* FROM calc_requests cr
+      WHERE cr.has_been_processed = FALSE
+      ORDER BY cr.created_at ASC
+      LIMIT 1
+    }.gsub(/\n\s*/, ' ')
+
+    calc_requests = CalcRequest.find_by_sql(sql_calc_records_to_process)
+
+    calc_requests.each do |calc_request|
+      sleep(0.05)
+
+      calc_result = CalcResult.new(
+        uuid:               SecureRandom.uuid,
+        calc_request_uuid:  calc_request.uuid,
+        ecosystem_uuid:     calc_request.ecosystem_uuid,
+        learner_uuid:       calc_request.learner_uuid,
+        has_been_reported:  false,
+      )
+
+      calc_request.has_been_processed = true;
+      calc_request.processed_at       = Time.now;
+
+      CalcRequest.transaction(isolation: :repeatable_read) do
+        calc_result.save!
+        calc_request.save!
+      end
+    end
+
+    elapsed = Time.now - start
+    Rails.logger.info "   wrote #{calc_requests.size} records in #{'%1.3e' % elapsed} sec"
+  end
+
+  def do_boss(count:, modulo:)
+    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    # sleep(0.05)
+  end
+end
+
+namespace :demo1 do
+  desc "Process CalcRequests"
+  task :calc, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
+    group_uuid    = args[:group_uuid]
+    work_interval = (args[:work_interval] || '1.0').to_f.seconds
+    boss_interval = 5.seconds
+    work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
+    work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
+
+    worker = CalcWorker.new(
+      group_uuid: group_uuid,
     )
 
     protocol = Protocol.new(
