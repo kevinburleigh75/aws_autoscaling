@@ -82,7 +82,7 @@ namespace :demo1 do
     worker = ResponseCalcWorker.new(
       group_uuid:         group_uuid,
       num_learners:       1000,
-      responses_per_iter: 10,
+      responses_per_iter: 1,
       start_date:         start_date,
       end_date:           end_date,
     )
@@ -124,6 +124,7 @@ class CalcWorker
     sql_calc_records_to_process = %Q{
       SELECT cr.* FROM calc_requests cr
       WHERE cr.has_been_processed = FALSE
+      AND   cr.partition_value % #{count} = #{modulo}
       ORDER BY cr.created_at ASC
       LIMIT 1
     }.gsub(/\n\s*/, ' ')
