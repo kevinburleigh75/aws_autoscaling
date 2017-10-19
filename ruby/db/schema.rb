@@ -34,6 +34,7 @@ ActiveRecord::Schema.define(version: 20171017133149) do
   create_table "calc_results", force: :cascade do |t|
     t.uuid "uuid", null: false
     t.uuid "calc_request_uuid", null: false
+    t.integer "partition_value", null: false
     t.uuid "ecosystem_uuid", null: false
     t.uuid "learner_uuid", null: false
     t.boolean "has_been_reported", null: false

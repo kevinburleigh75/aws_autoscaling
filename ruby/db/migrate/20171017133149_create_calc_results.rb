@@ -3,6 +3,7 @@ class CreateCalcResults < ActiveRecord::Migration[5.1]
     create_table :calc_results do |t|
       t.uuid     :uuid,                 null: false
       t.uuid     :calc_request_uuid,    null: false
+      t.integer  :partition_value,      null: false
 
       t.uuid     :ecosystem_uuid,       null: false
       t.uuid     :learner_uuid,         null: false
