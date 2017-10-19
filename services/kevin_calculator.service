@@ -1,12 +1,12 @@
 [Unit]
-Description=Kevin's Custom Service 2
+Description=Kevin's Calculator Service
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_prog.sh kprog2.rb
+ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_calculator.sh
 Restart=on-abort
 KillSignal=SIGINT
 TimeoutStopSec=5

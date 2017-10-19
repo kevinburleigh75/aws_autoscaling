@@ -217,15 +217,17 @@ class ReportWorker
 
     calc_results = CalcResult.find_by_sql(sql_calc_results_to_process)
 
-    sleep(0.2)
+    if calc_results.any?
+      sleep(0.2)
 
-    CalcResult.transaction(isolation: :repeatable_read) do
-      calc_results.each do |calc_request|
-        calc_request.has_been_reported = true
-        calc_request.reported_at       = Time.now
+      CalcResult.transaction(isolation: :repeatable_read) do
+        calc_results.each do |calc_request|
+          calc_request.has_been_reported = true
+          calc_request.reported_at       = Time.now
+        end
+
+        calc_results.map(&:save!)
       end
-
-      calc_results.map(&:save!)
     end
 
     elapsed = Time.now - start

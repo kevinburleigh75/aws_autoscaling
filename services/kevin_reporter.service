@@ -1,0 +1,15 @@
+[Unit]
+Description=Kevin's Reporter Service
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_reporter.sh
+Restart=on-abort
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
