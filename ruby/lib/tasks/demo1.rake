@@ -68,7 +68,7 @@ end
 
 namespace :demo1 do
   desc "Create LearnerResponses and CalcRequests"
-  task :response_calc, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
+  task :request, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '1.0').to_f.seconds
     boss_interval = 5.seconds
