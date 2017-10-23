@@ -120,40 +120,40 @@ class CalcWorker
 
     start = Time.now
 
-    sql_calc_records_to_process = %Q{
-      SELECT cr.* FROM calc_requests cr
-      WHERE cr.has_been_processed = FALSE
-      ORDER BY cr.created_at ASC
-      LIMIT 1
-      FOR UPDATE SKIP LOCKED
-    }.gsub(/\n\s*/, ' ')
+    num_calc_requests = CalcRequest.transaction(isolation: :repeatable_read) do
+      sql_calc_records_to_process = %Q{
+        SELECT cr.* FROM calc_requests cr
+        WHERE cr.has_been_processed = FALSE
+        ORDER BY cr.created_at ASC
+        LIMIT 1
+        FOR UPDATE SKIP LOCKED
+      }.gsub(/\n\s*/, ' ')
 
-    calc_requests = CalcRequest.find_by_sql(sql_calc_records_to_process)
+      calc_requests = CalcRequest.find_by_sql(sql_calc_records_to_process)
 
-    calc_results = calc_requests.map do |calc_request|
-      # sleep(0.05)
+      calc_requests.map do |calc_request|
+        # sleep(0.05)
 
-      calc_result = CalcResult.new(
-        uuid:               SecureRandom.uuid,
-        calc_request_uuid:  calc_request.uuid,
-        ecosystem_uuid:     calc_request.ecosystem_uuid,
-        learner_uuid:       calc_request.learner_uuid,
-        has_been_reported:  false,
-      )
+        calc_result = CalcResult.new(
+          uuid:               SecureRandom.uuid,
+          calc_request_uuid:  calc_request.uuid,
+          ecosystem_uuid:     calc_request.ecosystem_uuid,
+          learner_uuid:       calc_request.learner_uuid,
+          has_been_reported:  false,
+        )
 
-      calc_request.has_been_processed = true;
-      calc_request.processed_at       = Time.now;
+        calc_request.has_been_processed = true;
+        calc_request.processed_at       = Time.now;
 
-      calc_result
-    end
+        calc_result.save!
+        calc_request.save!
+      end
 
-    CalcRequest.transaction(isolation: :repeatable_read) do
-      calc_results.map(&:save!)
-      calc_requests.map(&:save!)
+      calc_requests.size
     end
 
     elapsed = Time.now - start
-    Rails.logger.info "   wrote #{calc_requests.size} records in #{'%1.3e' % elapsed} sec"
+    Rails.logger.info "   wrote #{num_calc_requests} records in #{'%1.3e' % elapsed} sec"
   end
 
   def do_boss(count:, modulo:)
