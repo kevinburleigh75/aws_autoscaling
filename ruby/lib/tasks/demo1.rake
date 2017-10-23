@@ -130,8 +130,8 @@ class CalcWorker
 
     calc_requests = CalcRequest.find_by_sql(sql_calc_records_to_process)
 
-    calc_requests.each do |calc_request|
-      sleep(0.05)
+    calc_results = calc_requests.map do |calc_request|
+      # sleep(0.05)
 
       calc_result = CalcResult.new(
         uuid:               SecureRandom.uuid,
@@ -144,10 +144,12 @@ class CalcWorker
       calc_request.has_been_processed = true;
       calc_request.processed_at       = Time.now;
 
-      CalcRequest.transaction(isolation: :repeatable_read) do
-        calc_result.save!
-        calc_request.save!
-      end
+      calc_result
+    end
+
+    CalcRequest.transaction(isolation: :repeatable_read) do
+      calc_results.map(&:save!)
+      calc_requests.map(&:save!)
     end
 
     elapsed = Time.now - start
@@ -218,7 +220,7 @@ class ReportWorker
     calc_results = CalcResult.find_by_sql(sql_calc_results_to_process)
 
     if calc_results.any?
-      sleep(0.2)
+      # sleep(0.2)
 
       CalcResult.transaction(isolation: :repeatable_read) do
         calc_results.each do |calc_request|
