@@ -40,7 +40,7 @@ module Demo2
         )
       }
 
-      LearnerResponse.transaction(isolation: :repeatable_read) do
+      LearnerResponse.transaction do
         LearnerResponse.import(learner_responses)
       end
 
@@ -53,7 +53,7 @@ module Demo2
         )
       }
 
-      CalcRequest.transaction(isolation: :repeatable_read) do
+      CalcRequest.transaction do
         CalcRequest.import calc_requests
       end
 
@@ -81,7 +81,7 @@ module Demo2
 
       start = Time.now
 
-      num_calc_requests = CalcRequest.transaction(isolation: :repeatable_read) do
+      num_calc_requests = CalcRequest.transaction do
         sql_calc_records_to_process = %Q{
           SELECT cr.* FROM calc_requests cr
           WHERE cr.has_been_processed = FALSE
@@ -119,7 +119,18 @@ module Demo2
 
     def do_boss(count:, modulo:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
-      # sleep(0.05)
+
+      CalcRequest.transaction do
+        arrival_rate = CalcRequest.where("created_at > ?", Time.now - 30.seconds).count/30
+
+        backlog_size = CalcRequest.where(has_been_processed: false).count
+
+        processing_rate = count / 0.25
+
+        puts "arrival_rate    = #{arrival_rate}"
+        puts "processing_rate = #{processing_rate}"
+        puts "backlog_size    = #{backlog_size}"
+      end
     end
   end
 
@@ -137,27 +148,25 @@ module Demo2
 
       start = Time.now
 
-      sql_calc_results_to_process = %Q{
-        SELECT cr.* FROM calc_results cr
-        WHERE cr.has_been_reported = FALSE
-        AND   cr.partition_value % #{count} = #{modulo}
-        ORDER BY cr.created_at ASC
-        LIMIT 100
-      }.gsub(/\n\s*/, ' ')
+      calc_results = CalcResult.transaction do
+        sql_calc_results_to_process = %Q{
+          SELECT cr.* FROM calc_results cr
+          WHERE cr.has_been_reported = FALSE
+          AND   cr.partition_value % #{count} = #{modulo}
+          ORDER BY cr.created_at ASC
+          LIMIT 100
+          FOR UPDATE SKIP LOCKED
+        }.gsub(/\n\s*/, ' ')
 
-      calc_results = CalcResult.find_by_sql(sql_calc_results_to_process)
+        calc_results = CalcResult.find_by_sql(sql_calc_results_to_process)
 
-      if calc_results.any?
-        # sleep(0.2)
-
-        CalcResult.transaction(isolation: :repeatable_read) do
-          calc_results.each do |calc_request|
-            calc_request.has_been_reported = true
-            calc_request.reported_at       = Time.now
-          end
-
-          calc_results.map(&:save!)
+        calc_results.each do |calc_result|
+          calc_result.has_been_reported = true
+          calc_result.reported_at       = Time.now
+          calc_result.save!
         end
+
+        calc_results
       end
 
       elapsed = Time.now - start
