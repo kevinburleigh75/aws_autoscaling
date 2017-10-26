@@ -61,7 +61,7 @@ module Demo2
       Rails.logger.info "   wrote #{learner_responses.size} + #{calc_requests.size} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
@@ -117,19 +117,43 @@ module Demo2
       Rails.logger.info "   wrote #{num_calc_requests} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+
+      launch_time_sec = 60
+      max_num_workers = 10
+      epsilon         = 1e-6
 
       CalcRequest.transaction do
         arrival_rate = CalcRequest.where("created_at > ?", Time.now - 30.seconds).count/30
 
-        backlog_size = CalcRequest.where(has_been_processed: false).count
+        backlog_size_requests = [CalcRequest.where(has_been_processed: false).count, 1].max
 
-        processing_rate = count / 0.25
+        cur_processing_rate_requests_per_sec = count / 0.25
+        cur_backlog_burn_time_sec            = backlog_size_requests / [cur_processing_rate_requests_per_sec - arrival_rate, epsilon].max
 
-        puts "arrival_rate    = #{arrival_rate}"
-        puts "processing_rate = #{processing_rate}"
-        puts "backlog_size    = #{backlog_size}"
+        inc_processing_rate_requests_per_sec = max_num_workers / 0.25
+        inc_backlog_burn_time_sec            = [cur_backlog_burn_time_sec, launch_time_sec + (backlog_size_requests + (arrival_rate - cur_processing_rate_requests_per_sec)*launch_time_sec) / [inc_processing_rate_requests_per_sec - arrival_rate, epsilon].max].min
+
+        dec_processing_rate_requests_per_sec = (count-1) / 0.25
+        dec_backlog_burn_time_sec            = backlog_size_requests / [dec_processing_rate_requests_per_sec - arrival_rate, epsilon].max
+
+        puts "arrival_rate              = #{arrival_rate}"
+        puts "backlog_size              = #{backlog_size_requests}"
+        puts "dec_processing_rate       = #{dec_processing_rate_requests_per_sec}"
+        puts "cur_processing_rate       = #{cur_processing_rate_requests_per_sec}"
+        puts "inc_processing_rate       = #{inc_processing_rate_requests_per_sec}"
+        puts "dec_backlog_burn_time_sec = #{dec_backlog_burn_time_sec}"
+        puts "cur_backlog_burn_time_sec = #{cur_backlog_burn_time_sec}"
+        puts "inc_backlog_burn_time_sec = #{inc_backlog_burn_time_sec}"
+
+        if inc_backlog_burn_time_sec < cur_backlog_burn_time_sec
+          puts "   SCALE UP"
+        elsif dec_backlog_burn_time_sec < 0.75
+          puts "   SCALE DOWN"
+        else
+          puts "   DO NOTHING"
+        end
       end
     end
   end
@@ -173,7 +197,7 @@ module Demo2
       Rails.logger.info "   wrote #{calc_results.size} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
@@ -210,8 +234,8 @@ namespace :demo2 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 
@@ -242,8 +266,8 @@ namespace :demo2 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 
@@ -274,8 +298,8 @@ namespace :demo2 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 

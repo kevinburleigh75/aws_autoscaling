@@ -90,8 +90,9 @@ class Protocol
       if am_boss && (next_boss_time.nil? || current_time >= next_boss_time)
         next_boss_time = current_time + @min_boss_interval
         @boss_block.call(
-          instance_count:  boss_record.instance_count,
-          instance_modulo: my_record.instance_modulo,
+          instance_count:    boss_record.instance_count,
+          instance_modulo:   my_record.instance_modulo,
+          min_work_interval: @min_work_interval,
         )
       end
 

@@ -61,7 +61,7 @@ module Demo1
       Rails.logger.info "   wrote #{learner_responses.size} + #{calc_requests.size} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
@@ -118,7 +118,7 @@ module Demo1
       Rails.logger.info "   wrote #{num_calc_requests} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
@@ -138,7 +138,7 @@ module Demo1
 
       start = Time.now
 
-      CalcResult.transaction do
+      calc_results_size = CalcResult.transaction do
         sql_calc_results_to_process = %Q{
           SELECT cr.* FROM calc_results cr
           WHERE cr.has_been_reported = FALSE
@@ -155,13 +155,15 @@ module Demo1
           calc_request.reported_at       = Time.now
           calc_request.save!
         end
+
+        calc_results.size
       end
 
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{calc_results.size} records in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   wrote #{calc_results_size} records in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:)
+    def do_boss(count:, modulo:, min_work_interval:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
@@ -198,8 +200,8 @@ namespace :demo1 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 
@@ -230,8 +232,8 @@ namespace :demo1 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 
@@ -262,8 +264,8 @@ namespace :demo1 do
       work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
                     worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
                   },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
+      boss_block: lambda { |instance_count:, instance_modulo:, min_work_interval:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, min_work_interval: min_work_interval)
                   }
     )
 
