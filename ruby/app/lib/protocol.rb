@@ -1,14 +1,16 @@
 class Protocol
+  attr_reader :min_work_interval
+  attr_reader :min_boss_interval
+  attr_reader :group_uuid
+  attr_reader :instance_uuid
 
-  def initialize(protocol_name:,
-                 min_work_interval:,
+  def initialize(min_work_interval:,
                  min_boss_interval:,
                  work_modulo: 1.0.seconds,
                  work_offset: 0.0.seconds,
                  group_uuid:,
                  work_block:,
                  boss_block:)
-    @protocol_name      = protocol_name
     @min_work_interval  = min_work_interval
     @min_boss_interval  = min_boss_interval
     @work_modulo        = work_modulo
@@ -18,7 +20,6 @@ class Protocol
     @boss_block         = boss_block
     @instance_uuid      = SecureRandom.uuid.to_s
   end
-
 
   def compute_next_work_time(last_time: nil, current_time:, instance_count:, instance_modulo:)
     if last_time.nil?
@@ -92,7 +93,7 @@ class Protocol
         @boss_block.call(
           instance_count:    boss_record.instance_count,
           instance_modulo:   my_record.instance_modulo,
-          min_work_interval: @min_work_interval,
+          protocol:          self,
         )
       end
 
@@ -151,7 +152,6 @@ class Protocol
 
         ActiveRecord::Base.connection_pool.with_connection do
           ProtocolRecord.create!(
-            protocol_name:       @protocol_name,
             group_uuid:          @group_uuid,
             instance_uuid:       @instance_uuid,
             instance_count:      1,

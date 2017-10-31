@@ -10,10 +10,18 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171017133149) do
+ActiveRecord::Schema.define(version: 20171031115929) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
+
+  create_table "autoscaling_requests", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.uuid "group_uuid", null: false
+    t.string "request_type", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
 
   create_table "calc_requests", force: :cascade do |t|
     t.uuid "uuid", null: false
@@ -80,7 +88,6 @@ ActiveRecord::Schema.define(version: 20171017133149) do
   end
 
   create_table "protocol_records", force: :cascade do |t|
-    t.string "protocol_name", null: false
     t.uuid "group_uuid", null: false
     t.uuid "instance_uuid", null: false
     t.integer "instance_count", null: false

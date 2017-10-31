@@ -191,7 +191,6 @@ namespace :demo1 do
     )
 
     protocol = Protocol.new(
-      protocol_name:      'exper',
       min_work_interval:  work_interval,
       min_boss_interval:  boss_interval,
       work_modulo:        work_modulo,
@@ -223,7 +222,6 @@ namespace :demo1 do
     )
 
     protocol = Protocol.new(
-      protocol_name:      'exper',
       min_work_interval:  work_interval,
       min_boss_interval:  boss_interval,
       work_modulo:        work_modulo,
@@ -255,7 +253,6 @@ namespace :demo1 do
     )
 
     protocol = Protocol.new(
-      protocol_name:      'exper',
       min_work_interval:  work_interval,
       min_boss_interval:  boss_interval,
       work_modulo:        work_modulo,
