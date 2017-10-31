@@ -152,7 +152,7 @@ module Demo2
           puts "cur_backlog_burn_time_sec = #{cur_backlog_burn_time_sec}"
           puts "inc_backlog_burn_time_sec = #{inc_backlog_burn_time_sec}"
 
-          if inc_backlog_burn_time_sec < cur_backlog_burn_time_sec
+          if inc_backlog_burn_time_sec < cur_backlog_burn_time_sec - 10.seconds
             AutoscalingRequest.create!(
               uuid:         SecureRandom.uuid,
               group_uuid:   protocol.group_uuid,
