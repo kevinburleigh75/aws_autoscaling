@@ -120,16 +120,17 @@ module Demo2
     def do_boss(count:, modulo:, protocol:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
 
-      launch_time_sec                = Rails.env.production? ? 60 : 10
+      launch_time_sec                = Rails.env.production? ? 120 : 10
       min_autoscale_request_interval = launch_time_sec
       max_num_workers                = 10
       epsilon                        = 1e-6
+      rate_average_time              = Rails.env.production? ? 300 : 30
 
       CalcRequest.transaction do
         last_autoscale_request = AutoscalingRequest.order(created_at: :desc).first
 
         if last_autoscale_request.nil? or (last_autoscale_request.created_at < Time.now - min_autoscale_request_interval)
-          arrival_rate = CalcRequest.where("created_at > ?", Time.now - 30.seconds).count/30
+          arrival_rate = CalcRequest.where("created_at > ?", Time.now - rate_average_time.seconds).count/rate_average_time
 
           backlog_size_requests = [CalcRequest.where(has_been_processed: false).count, 1].max
 
@@ -244,7 +245,7 @@ namespace :demo2 do
   task :request, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '1.0').to_f.seconds
-    boss_interval = 5.seconds
+    boss_interval = Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
     work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
 
@@ -282,7 +283,7 @@ namespace :demo2 do
   task :calc, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '1.0').to_f.seconds
-    boss_interval = 5.seconds
+    boss_interval = Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
     work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
 
@@ -313,7 +314,7 @@ namespace :demo2 do
   task :report, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '1.0').to_f.seconds
-    boss_interval = 5.seconds
+    boss_interval = Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
     work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
 
