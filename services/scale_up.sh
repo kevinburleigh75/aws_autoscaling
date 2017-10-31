@@ -1,7 +1,7 @@
 #!/bin/bash
 
 INSTANCE_ID="$(curl --silent http://169.254.169.254/latest/meta-data/instance-id)"
-REGION="$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk '{print $3}' | sed -e 's/"//g')"
+REGION="$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk '{print $3}' | sed -e 's/"//g' | sed -e 's/,//g')"
 echo instance $INSTANCE_ID
 echo region   $REGION
 
