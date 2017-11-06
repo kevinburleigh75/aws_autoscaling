@@ -7,7 +7,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
 ExecStart=/bin/bash /home/ubuntu/aws_autoscaling/services/run_requestor.sh
-Restart=on-abort
+Restart=always
 KillSignal=SIGINT
 TimeoutStopSec=5
 
