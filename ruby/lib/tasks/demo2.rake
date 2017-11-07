@@ -178,14 +178,14 @@ module Demo2
     def scale_up_action
       puts "   SCALE UP"
       if Rails.env.production?
-        system('/bin/bash /home/ubuntu/aws_autoscaling/services/scale_up.sh')
+        system('/bin/bash /home/ubuntu/primary_repo/services/scale_up.sh')
       end
     end
 
     def scale_down_action
       puts "   SCALE DOWN"
       if Rails.env.production?
-        system('/bin/bash /home/ubuntu/aws_autoscaling/services/scale_down.sh')
+        system('/bin/bash /home/ubuntu/primary_repo/services/scale_down.sh')
       end
     end
 
