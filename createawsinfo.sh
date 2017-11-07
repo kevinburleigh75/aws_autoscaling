@@ -9,11 +9,11 @@ aws configure set region $AWS_REGION
 AWS_ASG_NAME="$(aws autoscaling describe-auto-scaling-instances --instance-ids=$AWS_INSTANCE_ID --query 'AutoScalingInstances[0].AutoScalingGroupName' | sed -e 's/"//g')"
 AWS_ASG_MAX_SIZE="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $AWS_ASG_NAME --query 'AutoScalingGroups[0].MaxSize' | sed -e 's/"//g')"
 
-echo AWS_INSTANCE_ID=$AWS_INSTANCE_ID >> $AWSINFO_FILENAME
-echo AWS_REGION=$AWS_REGION >> $AWSINFO_FILENAME
-echo AWS_ASG_NAME=$AWS_ASG_NAME >> $AWSINFO_FILENAME
-echo AWS_ASG_MAX_SIZE=$AWS_ASG_MAX_SIZE >> $AWSINFO_FILENAME
+echo export AWS_INSTANCE_ID=$AWS_INSTANCE_ID >> $AWSINFO_FILENAME
+echo export AWS_REGION=$AWS_REGION >> $AWSINFO_FILENAME
+echo export AWS_ASG_NAME=$AWS_ASG_NAME >> $AWSINFO_FILENAME
+echo export AWS_ASG_MAX_SIZE=$AWS_ASG_MAX_SIZE >> $AWSINFO_FILENAME
 
-echo ". .awsinfo" >> $PROFILE_FILENAME
+echo ". $HOME/.awsinfo" >> $PROFILE_FILENAME
 
-. .awsinfo
+. $HOME/.awsinfo
