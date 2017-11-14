@@ -1,0 +1,110 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "ce42e672-9edc-4b7a-bdd5-8dae1ee60a66": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 260,
+                    "y": 120
+                },
+                "z": 0,
+                "embeds": []
+            }
+        }
+    },
+    "Resources": {
+        "AsgDb": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "AllocatedStorage": 100,
+                "DBInstanceClass": "db.t2.medium",
+                "Engine": "postgres",
+                "VPCSecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "DBInstanceIdentifier": {
+                    "Ref": "DbInstanceIdentifier"
+                },
+                "MasterUsername": {
+                    "Ref": "MasterUsername"
+                },
+                "MasterUserPassword": {
+                    "Ref": "MasterPassword"
+                },
+                "StorageType": "gp2",
+                "DBName": {
+                    "Ref": "DbName"
+                },
+                "Port": {
+                    "Ref": "DbPort"
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "ce42e672-9edc-4b7a-bdd5-8dae1ee60a66"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "DbInstanceIdentifier": {
+            "Description": "name of the db instance",
+            "Type": "String",
+            "Default": "asgdbinstance"
+        },
+        "DbName": {
+            "Description": "name of the database",
+            "Type": "String",
+            "Default": "asgdb"
+        },
+        "DbPort": {
+            "Description": "port for the database",
+            "Type": "String",
+            "Default": "5432"
+        },
+        "MasterUsername": {
+            "Description": "master username for db access",
+            "Default": "masteruser",
+            "Type": "String"
+        },
+        "MasterPassword": {
+            "Description": "password for db access",
+            "Type": "String",
+            "NoEcho": "true"
+        }
+    },
+    "Outputs": {
+        "Endpoint": {
+            "Description": "URL of the database host",
+            "Value": {
+                "Fn::GetAtt": [
+                    "AsgDb",
+                    "Endpoint.Address"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-Endpoint"
+                }
+            }
+        },
+        "DbPort": {
+            "Description": "Database port",
+            "Value": {
+                "Fn::GetAtt": [
+                    "AsgDb",
+                    "Endpoint.Port"
+                ]
+            },
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-DbPort"
+                }
+            }
+        }
+    }
+}
