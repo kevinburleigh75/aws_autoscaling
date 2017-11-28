@@ -6,18 +6,25 @@ class Protocol
 
   def initialize(min_work_interval:,
                  min_boss_interval:,
+                 min_end_interval:,
+                 min_update_interval:,
                  work_modulo: 1.0.seconds,
                  work_offset: 0.0.seconds,
                  group_uuid:,
                  work_block:,
-                 boss_block:)
-    @min_work_interval  = min_work_interval
-    @min_boss_interval  = min_boss_interval
-    @work_modulo        = work_modulo
-    @work_offset        = work_offset
-    @group_uuid         = group_uuid
-    @work_block         = work_block
-    @boss_block         = boss_block
+                 boss_block:,
+                 end_block:)
+    @min_work_interval   = min_work_interval
+    @min_boss_interval   = min_boss_interval
+    @min_end_interval    = min_end_interval
+    @min_update_interval = min_update_interval
+    @work_modulo         = work_modulo
+    @work_offset         = work_offset
+    @group_uuid          = group_uuid
+    @work_block          = work_block
+    @boss_block          = boss_block
+    @end_block           = end_block
+
     @instance_uuid      = SecureRandom.uuid.to_s
   end
 
@@ -36,12 +43,20 @@ class Protocol
     # current_time = Time.now
     next_boss_time       = nil
     next_work_time       = nil
+    next_end_time        = Time.now
     prev_instance_count  = nil
     prev_instance_modulo = nil
     # puts "current_time:   #{round_time(time: current_time).utc.iso8601(6)}"
     # puts "next_work_time: #{round_time(time: next_work_time).utc.iso8601(6)}"
 
     loop do
+      current_time = Time.now
+      if current_time >= next_end_time
+        val = @end_block.call()
+        next_end_time = current_time + @min_end_interval
+        break if val
+      end
+
       my_record, group_records, dead_records = _read_records
       unless my_record
         puts "create!"
@@ -78,7 +93,7 @@ class Protocol
           puts "allocate myself!"
           _allocate_modulo(my_record, group_records)
         end
-        sleep(0.1)
+        # sleep(0.1)
         next
       end
 
@@ -127,13 +142,14 @@ class Protocol
         )
         # puts "next_work_time: #{round_time(time: next_work_time).utc.iso8601(6)}"
       else
-        intervals = [0.25.seconds, next_work_time - current_time]
-        intervals << next_boss_time - current_time if am_boss
+        current_time = Time.now
+        intervals = [@min_update_interval, next_work_time-current_time, next_end_time-current_time]
+        intervals << next_boss_time-current_time if am_boss
         sleep(intervals.min)
       end
     end
   rescue Interrupt => ex
-    puts 'exiting'
+    # puts 'exiting'
   rescue Exception => ex
     raise ex
   ensure
@@ -142,7 +158,7 @@ class Protocol
 
 
   def _create_record
-    puts "create!"
+    # puts "create!"
 
     loop do
       retries ||= 0
@@ -225,7 +241,7 @@ class Protocol
     my_record.instance_count = group_records.count
 
     _save_record(my_record)
-    sleep(0.1)
+    # sleep(0.1)
   end
 
 
@@ -249,11 +265,11 @@ class Protocol
         _save_record(my_record)
         break
       rescue ActiveRecord::WrappedDatabaseException
-        sleep(0.1)
+        # sleep(0.1)
       end
     end
 
-    sleep(0.1)
+    # sleep(0.1)
   end
 
 end
