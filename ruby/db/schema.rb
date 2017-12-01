@@ -10,81 +10,33 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171031115929) do
+ActiveRecord::Schema.define(version: 20171130152950) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
-  create_table "autoscaling_requests", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.uuid "group_uuid", null: false
-    t.string "request_type", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
-  create_table "calc_requests", force: :cascade do |t|
-    t.uuid "uuid", null: false
+  create_table "course_events", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "course_seqnum", null: false
+    t.string "event_type", null: false
+    t.uuid "event_uuid", null: false
+    t.datetime "event_time", null: false
     t.integer "partition_value", null: false
-    t.uuid "ecosystem_uuid", null: false
-    t.uuid "learner_uuid", null: false
-    t.boolean "has_been_processed", null: false
-    t.datetime "processed_at"
+    t.boolean "has_been_processed_by_stream_1", null: false
+    t.boolean "has_been_processed_by_stream_2", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_calc_requests_on_created_at"
-    t.index ["has_been_processed"], name: "index_calc_requests_on_has_been_processed"
-    t.index ["learner_uuid", "ecosystem_uuid"], name: "index_calc_requests_on_learner_uuid_and_ecosystem_uuid"
-    t.index ["learner_uuid"], name: "index_calc_requests_on_learner_uuid"
-    t.index ["uuid"], name: "index_calc_requests_on_uuid", unique: true
+    t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
+    t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
+    t.index ["has_been_processed_by_stream_1", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs1_cu_csn"
+    t.index ["has_been_processed_by_stream_1"], name: "index_course_events_on_has_been_processed_by_stream_1"
+    t.index ["has_been_processed_by_stream_2", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs2_cu_csn"
+    t.index ["has_been_processed_by_stream_2"], name: "index_course_events_on_has_been_processed_by_stream_2"
   end
 
-  create_table "calc_results", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.uuid "calc_request_uuid", null: false
-    t.integer "partition_value", null: false
-    t.uuid "ecosystem_uuid", null: false
-    t.uuid "learner_uuid", null: false
-    t.boolean "has_been_reported", null: false
-    t.datetime "reported_at"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["calc_request_uuid"], name: "index_calc_results_on_calc_request_uuid", unique: true
-    t.index ["created_at"], name: "index_calc_results_on_created_at"
-    t.index ["has_been_reported"], name: "index_calc_results_on_has_been_reported"
-    t.index ["uuid"], name: "index_calc_results_on_uuid", unique: true
-  end
-
-  create_table "exper_records", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.uuid "uuid1", null: false
-    t.uuid "uuid2", null: false
-    t.uuid "uuid3", null: false
-    t.uuid "uuid4", null: false
-    t.uuid "uuid5", null: false
-    t.uuid "uuid6", null: false
-    t.uuid "uuid7", null: false
-    t.uuid "uuid8", null: false
-    t.uuid "uuid9", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["uuid"], name: "index_exper_records_on_uuid"
-  end
-
-  create_table "learner_responses", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.uuid "ecosystem_uuid", null: false
-    t.uuid "learner_uuid", null: false
-    t.uuid "question_uuid", null: false
-    t.uuid "trial_uuid", null: false
-    t.boolean "was_correct", null: false
-    t.datetime "responded_at", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_learner_responses_on_created_at"
-    t.index ["learner_uuid"], name: "index_learner_responses_on_learner_uuid"
-    t.index ["question_uuid"], name: "index_learner_responses_on_question_uuid"
-    t.index ["uuid"], name: "index_learner_responses_on_uuid", unique: true
+  create_table "course_states", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.boolean "is_archived", null: false
   end
 
   create_table "protocol_records", force: :cascade do |t|
@@ -98,6 +50,40 @@ ActiveRecord::Schema.define(version: 20171031115929) do
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
     t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
+  end
+
+  create_table "stream1_bundle_entries", force: :cascade do |t|
+    t.uuid "course_event_uuid", null: false
+    t.uuid "stream1_bundle_uuid", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "stream1_bundle_receipts", force: :cascade do |t|
+    t.uuid "stream1_client_uuid", null: false
+    t.uuid "stream1_bundle_uuid", null: false
+    t.boolean "has_been_acknowledged", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "stream1_bundles", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.integer "seqnum", null: false
+    t.uuid "course_uuid", null: false
+    t.integer "course_event_seqnum_lo", null: false
+    t.integer "course_event_seqnum_hi", null: false
+    t.boolean "is_open", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+  end
+
+  create_table "stream1_clients", force: :cascade do |t|
+    t.uuid "uuid", null: false
+    t.boolean "is_prepped", null: false
+    t.boolean "is_active", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
 end
