@@ -4,5 +4,8 @@ class CreateCourseStates < ActiveRecord::Migration[5.1]
       t.uuid    :course_uuid, null: false
       t.boolean :is_archived, null: false
     end
+
+    add_index :course_states, :course_uuid,
+                              unique: true
   end
 end

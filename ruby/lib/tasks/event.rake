@@ -14,6 +14,16 @@ module Event
         result
       }
 
+      CourseState.transaction(isolation: :read_committed) do
+        course_states = @course_uuids.map { |course_uuid|
+          CourseState.new(
+            course_uuid: course_uuid,
+            is_archived: false,
+          )
+        }
+
+        CourseState.import course_states
+      end
     end
 
     def do_work(count:, modulo:, am_boss:)
@@ -80,14 +90,15 @@ module Event
         ## Find the N oldest unprocessed events per course of interest.
         ##
 
+        uuid_order = ['ASC', 'DESC'].sample
+
         sql_find_course_events = %Q{
           SELECT * FROM course_events
           WHERE event_uuid IN (
             SELECT * FROM (
               SELECT event_uuid FROM (
-                SELECT DISTINCT course_uuid FROM course_events
-                WHERE has_been_processed_by_stream_#{@stream_id} = FALSE
-                AND uuid_partition(course_uuid) % #{count} = #{modulo}
+                SELECT DISTINCT course_uuid FROM course_states cs
+                WHERE uuid_partition(cs.course_uuid) % #{count} = #{modulo}
               ) cuuids_oi
               LEFT JOIN LATERAL (
                 SELECT * FROM course_events
@@ -96,7 +107,7 @@ module Event
                 ORDER BY course_uuid, course_seqnum ASC
                 LIMIT 10
               ) oces ON TRUE
-              ORDER BY oces.course_uuid, oces.course_seqnum ASC
+              ORDER BY oces.course_uuid #{uuid_order}, oces.course_seqnum ASC
               LIMIT 100
             ) euuids
             ORDER BY event_uuid ASC
