@@ -11,7 +11,7 @@ class CreateCourseEvents < ActiveRecord::Migration[5.1]
       t.boolean   :has_been_processed_by_stream_1, null: false
       t.boolean   :has_been_processed_by_stream_2, null: false
 
-      t.timestamps
+      t.timestamps null: false
     end
 
     add_index :course_events, :course_uuid

@@ -8,7 +8,7 @@ class CreateStream1Bundles < ActiveRecord::Migration[5.1]
       t.integer :course_event_seqnum_hi,   null: false
       t.boolean :is_open,                  null: false
 
-      t.timestamps
+      t.timestamps null: false
 
     end
   end

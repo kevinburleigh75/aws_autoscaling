@@ -4,7 +4,7 @@ class CreateStream1BundleEntries < ActiveRecord::Migration[5.1]
       t.uuid :course_event_uuid,   null: false
       t.uuid :stream1_bundle_uuid, null: false
 
-      t.timestamps
+      t.timestamps null: false
     end
   end
 end

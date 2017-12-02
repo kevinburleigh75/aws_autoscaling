@@ -10,18 +10,20 @@ module Event
       @event_types    = ['Response', 'EcosystemUpdate', 'Lifecycle']
       @course_uuids   = num_courses.times.map{ SecureRandom.uuid.to_s }
       @course_seqnums = @course_uuids.inject({}) { |result, uuid|
-        result[uuid] = Array(0..3)
+        result[uuid] = Array(0..0)
         result
       }
 
-      CourseState.transaction(isolation: :read_committed) do
-        course_states = @course_uuids.map { |course_uuid|
-          CourseState.new(
-            course_uuid: course_uuid,
-            is_archived: false,
-          )
-        }
+      course_states = @course_uuids.map { |course_uuid|
+        CourseState.new(
+          course_uuid:        course_uuid,
+          last_course_seqnum: -1,
+          needs_attention:    false,
+          waiting_since:      Time.now,
+        )
+      }
 
+      CourseState.transaction(isolation: :read_committed) do
         CourseState.import course_states
       end
     end
@@ -55,8 +57,48 @@ module Event
         )
       }
 
-      CalcRequest.transaction do
+      course_uuids       = course_events.map(&:course_uuid).uniq.sort
+      course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+
+      seqnums_by_course_uuid = course_events.inject({}) { |result, event|
+        result[event.course_uuid] = {} unless result.has_key?(event.course_uuid)
+        result[event.course_uuid][event.course_seqnum] = true
+        result
+      }
+
+      CourseState.transaction(isolation: :read_committed) do
+        ##
+        ## Find and lock the associated course states.
+        ##
+
+        sql_find_and_lock_course_states = %Q{
+          SELECT * FROM course_states
+          WHERE course_uuid IN ( #{course_uuid_values} )
+          ORDER BY course_uuid ASC
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
+
+        course_states = CourseState.find_by_sql(sql_find_and_lock_course_states)
+
+        ##
+        ## Import the course events.
+        ##
+
         CourseEvent.import course_events
+
+        ##
+        ## Update and save the course states
+        ##
+
+        time = Time.now
+
+        course_states.each do |state|
+          if seqnums_by_course_uuid[state.course_uuid].has_key?(1 + state.last_course_seqnum)
+            state.needs_attention = true
+            state.waiting_since   = time
+            state.save!
+          end
+        end
       end
 
       elapsed = Time.now - start
@@ -85,66 +127,102 @@ module Event
 
       start = Time.now
 
-      events_size = CourseEvent.transaction(isolation: :read_committed) do
+      course_events_size = CourseEvent.transaction(isolation: :read_committed) do
         ##
-        ## Find the N oldest unprocessed events per course of interest.
+        ## Find the courses that need attention and have been waiting the longest.
         ##
 
-        uuid_order = ['ASC', 'DESC'].sample
-
-        sql_find_course_events = %Q{
-          SELECT * FROM course_events
-          WHERE event_uuid IN (
-            SELECT * FROM (
-              SELECT event_uuid FROM (
-                SELECT DISTINCT course_uuid FROM course_states cs
-                WHERE uuid_partition(cs.course_uuid) % #{count} = #{modulo}
-              ) cuuids_oi
-              LEFT JOIN LATERAL (
-                SELECT * FROM course_events
-                WHERE course_uuid = cuuids_oi.course_uuid
-                AND has_been_processed_by_stream_#{@stream_id} = FALSE
-                ORDER BY course_uuid, course_seqnum ASC
-                LIMIT 10
-              ) oces ON TRUE
-              ORDER BY oces.course_uuid #{uuid_order}, oces.course_seqnum ASC
-              LIMIT 100
-            ) euuids
-            ORDER BY event_uuid ASC
+        sql_find_and_lock_course_states = %Q{
+          SELECT * FROM course_states
+          WHERE course_uuid IN (
+            SELECT course_uuid FROM course_states
+            WHERE needs_attention = TRUE
+            AND   uuid_partition(course_uuid) % #{count} = #{modulo}
+            ORDER BY waiting_since ASC
+            LIMIT 10
           )
+          ORDER BY course_uuid ASC
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        # puts sql_find_course_events
-        course_events = CourseEvent.find_by_sql(sql_find_course_events)
+        course_states = CourseState.find_by_sql(sql_find_and_lock_course_states)
+        puts "#{course_states.count} courses need attention"
+        next 0 if course_states.none?
+
+        ##
+        ## Find the relevant events for the target courses.
+        ##
+
+        course_uuids       = course_states.map(&:course_uuid).uniq.sort
+        course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+
+        sql_find_and_lock_course_events = %Q{
+          SELECT * FROM course_events
+          WHERE course_events.event_uuid IN (
+            SELECT xx.event_uuid FROM (
+              SELECT * FROM course_events
+              WHERE course_uuid IN ( #{course_uuid_values} )
+              AND has_been_processed_by_stream_#{@stream_id} = FALSE
+            ) events_oi
+            LEFT JOIN LATERAL (
+              SELECT * FROM course_events
+              WHERE course_uuid = events_oi.course_uuid
+              AND has_been_processed_by_stream_#{@stream_id} = FALSE
+              ORDER BY course_uuid, course_seqnum ASC
+              LIMIT 10
+            ) xx ON TRUE
+          )
+          ORDER BY event_uuid ASC
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
+
+        course_events = CourseEvent.find_by_sql(sql_find_and_lock_course_events)
         puts course_events.size
-        # puts "#{course_events.map(&:event_uuid).sort}"
 
         ##
         ## Create/update bundles and create bundle entries
         ##
 
-        # bools = course_events.map{|event| event.send("has_been_processed_by_stream_#{@stream_id}".to_sym)}
-        # puts "B: #{bools}"
+        ##
+        ## Update the course states and events
+        ##
 
-        course_events.each do |course_event|
-          course_event.send("has_been_processed_by_stream_#{@stream_id}=".to_sym, true)
+        course_states.each do |state|
+          target_events = course_events.select{|event| event.course_uuid == state.course_uuid}
+                                       .sort_by{|event| event.course_seqnum}
+
+          gap_found              = false
+          new_last_course_seqnum = state.last_course_seqnum
+
+          target_events.each do |event|
+            puts "  course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_uuid}"
+            if event.course_seqnum != new_last_course_seqnum + 1
+              puts "    gap found"
+              gap_found = true
+              break
+            end
+            new_last_course_seqnum += 1
+
+            event.send("has_been_processed_by_stream_#{@stream_id}=".to_sym, true)
+            event.save!
+          end
+
+          if (target_events.count < 10) or gap_found
+            puts "    course does not need further attention"
+            state.needs_attention = false
+          end
+
+          state.last_course_seqnum = new_last_course_seqnum
+          state.waiting_since      = Time.now
+
+          state.save!
         end
-
-        # bools = course_events.map{|event| event.send("has_been_processed_by_stream_#{@stream_id}".to_sym)}
-        # puts "A: #{bools}"
-
-        ##
-        ## Write everything to the db.
-        ##
-
-        course_events.map(&:save!)
 
         course_events.size
       end
 
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{events_size} events in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   wrote #{course_events_size} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)

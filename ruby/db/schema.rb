@@ -36,7 +36,15 @@ ActiveRecord::Schema.define(version: 20171130152950) do
 
   create_table "course_states", force: :cascade do |t|
     t.uuid "course_uuid", null: false
-    t.boolean "is_archived", null: false
+    t.integer "last_course_seqnum", null: false
+    t.boolean "needs_attention", null: false
+    t.datetime "waiting_since", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["course_uuid"], name: "index_course_states_on_course_uuid", unique: true
+    t.index ["needs_attention", "waiting_since"], name: "index_course_states_on_needs_attention_and_waiting_since"
+    t.index ["needs_attention"], name: "index_course_states_on_needs_attention"
+    t.index ["waiting_since"], name: "index_course_states_on_waiting_since"
   end
 
   create_table "protocol_records", force: :cascade do |t|

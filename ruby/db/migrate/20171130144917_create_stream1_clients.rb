@@ -5,7 +5,7 @@ class CreateStream1Clients < ActiveRecord::Migration[5.1]
       t.boolean :is_prepped, null: false
       t.boolean :is_active,  null: false
 
-      t.timestamps
+      t.timestamps null: false
     end
   end
 end
