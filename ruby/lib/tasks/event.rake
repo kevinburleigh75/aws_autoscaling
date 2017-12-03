@@ -1,4 +1,30 @@
 module Event
+  @@event_data_by_type = {
+    'Response': {
+      size:   1_000,
+      freq: 100_000.0,
+    },
+    'EcosystemUpdate': {
+      size: 1_000_000,
+      freq:         1.0,
+    },
+    'Lifecycle': {
+      size:    50,
+      freq:     1.0,
+    },
+  }
+
+  @@event_types = @@event_data_by_type.keys.sort
+
+
+  def self.event_data_by_type
+    @@event_data_by_type
+  end
+
+  def self.event_types
+    @@event_types
+  end
+
   class EventWorker
     def initialize(group_uuid:, events_per_interval:, num_courses:)
       @group_uuid          = group_uuid
@@ -7,12 +33,16 @@ module Event
 
       @counter = 0
 
-      @event_types    = ['Response', 'EcosystemUpdate', 'Lifecycle']
       @course_uuids   = num_courses.times.map{ SecureRandom.uuid.to_s }
       @course_seqnums = @course_uuids.inject({}) { |result, uuid|
         result[uuid] = Array(0..0)
         result
       }
+
+      freqs          = Event::event_types.map{|type| Event::event_data_by_type[type][:freq]}
+      freq_sum       = freqs.inject(&:+)
+      freq_cumsums   = freqs.inject([]){|result, freq| result << (result.last || 0) + freq; result}
+      @event_cutoffs = freq_cumsums.map{|value| value/freq_sum}
 
       course_states = @course_uuids.map { |course_uuid|
         CourseState.new(
@@ -45,15 +75,20 @@ module Event
         @course_seqnums[course_uuid].delete(seqnum)
         @course_seqnums[course_uuid] << new_max_seqnum
 
+        rand_value = Kernel::rand()
+        event_type = Event::event_types[@event_cutoffs.each_index.detect{|ii| @event_cutoffs[ii] >= rand_value}]
+
+        # puts "%s %1.3f %s" % [@event_cutoffs.map{|ec| "%1.3f" % ec}.join(','), rand_value, event_type]
+
         CourseEvent.new(
           course_uuid:                    course_uuid,
           course_seqnum:                  seqnum,
-          event_type:                     @event_types.sample,
+          event_type:                     event_type,
           event_uuid:                     SecureRandom.uuid.to_s,
           event_time:                     Time.now,
           partition_value:                Kernel.rand(1*2*3*4*5*6*7*8*9*10),
-          has_been_processed_by_stream_1: false,
-          has_been_processed_by_stream_2: false,
+          has_been_processed_by_stream1:  false,
+          has_been_processed_by_stream2:  false,
         )
       }
 
@@ -116,7 +151,8 @@ module Event
       @group_uuid = group_uuid
       @stream_id  = stream_id
 
-      @counter = 0
+      @max_bundle_size = 50_000
+      @counter         = 0
     end
 
     def do_work(count:, modulo:, am_boss:)
@@ -162,12 +198,12 @@ module Event
             SELECT xx.event_uuid FROM (
               SELECT * FROM course_events
               WHERE course_uuid IN ( #{course_uuid_values} )
-              AND has_been_processed_by_stream_#{@stream_id} = FALSE
+              AND has_been_processed_by_stream#{@stream_id} = FALSE
             ) events_oi
             LEFT JOIN LATERAL (
               SELECT * FROM course_events
               WHERE course_uuid = events_oi.course_uuid
-              AND has_been_processed_by_stream_#{@stream_id} = FALSE
+              AND has_been_processed_by_stream#{@stream_id} = FALSE
               ORDER BY course_uuid, course_seqnum ASC
               LIMIT 10
             ) xx ON TRUE
@@ -180,30 +216,95 @@ module Event
         puts course_events.size
 
         ##
-        ## Create/update bundles and create bundle entries
+        ## Find the currently open bundles for the target stream.
         ##
 
+        sql_find_and_lock_stream_bundles = %Q{
+          SELECT * FROM stream#{@stream_id}_bundles
+          WHERE is_open = TRUE
+          AND course_uuid IN ( #{course_uuid_values} )
+          ORDER BY uuid ASC
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
+
+        stream_bundles = Object.const_get("Stream#{@stream_id}Bundle").find_by_sql(sql_find_and_lock_stream_bundles)
+
         ##
-        ## Update the course states and events
+        ## Update the course states, bundles and events
         ##
 
         course_states.each do |state|
           target_events = course_events.select{|event| event.course_uuid == state.course_uuid}
                                        .sort_by{|event| event.course_seqnum}
 
+          cur_stream_open_bundle = stream_bundles.detect{|bundle| bundle.course_uuid == state.course_uuid}
+
           gap_found              = false
           new_last_course_seqnum = state.last_course_seqnum
 
+          puts "  processing course #{state.course_uuid}"
           target_events.each do |event|
-            puts "  course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_uuid}"
+            puts "    course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_type} #{event.event_uuid}"
+
+            ##
+            ## If the event causes a gap, stop processing events for the target course.
+            ##
+
             if event.course_seqnum != new_last_course_seqnum + 1
-              puts "    gap found"
+              puts "      gap found"
               gap_found = true
               break
             end
+
             new_last_course_seqnum += 1
 
-            event.send("has_been_processed_by_stream_#{@stream_id}=".to_sym, true)
+            ##
+            ## Add the event to the currently open bundle, if possible.
+            ## If not, close the old bundle and create a new bundle for it.
+            ##
+
+            event_size = Event::event_data_by_type[event.event_type.to_sym][:size]
+
+            if cur_stream_open_bundle && (cur_stream_open_bundle.size + event_size > @max_bundle_size)
+              cur_stream_open_bundle.is_open = false
+              cur_stream_open_bundle.save!
+              cur_stream_open_bundle = nil
+            end
+
+            if cur_stream_open_bundle.nil?
+              cur_stream_open_bundle = Object.const_get("Stream#{@stream_id}Bundle").new(
+                uuid:                   SecureRandom.uuid.to_s,
+                course_uuid:            state.course_uuid,
+                course_event_seqnum_lo: event.course_seqnum,
+                course_event_seqnum_hi: event.course_seqnum,
+                size:                   event_size,
+                is_open:                true,
+              )
+            else
+              cur_stream_open_bundle.course_event_seqnum_hi  = event.course_seqnum
+              cur_stream_open_bundle.size                   += event_size
+            end
+
+            if cur_stream_open_bundle.size >= @max_bundle_size
+              cur_stream_open_bundle.is_open = false
+            end
+
+            cur_stream_open_bundle.save!
+
+            ##
+            ## Create a bundle entry for this event/stream combo.
+            ##
+
+            Object.const_get("Stream#{@stream_id}BundleEntry").create!(
+              course_event_uuid:  event.event_uuid,
+              stream_bundle_uuid: cur_stream_open_bundle.uuid,
+            )
+
+            ##
+            ## Update the event to show that it's been processed by the current stream.
+            ##
+
+            event.send("has_been_processed_by_stream#{@stream_id}=".to_sym, true)
             event.save!
           end
 
