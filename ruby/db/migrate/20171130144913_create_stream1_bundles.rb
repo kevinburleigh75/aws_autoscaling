@@ -1,12 +1,14 @@
 class CreateStream1Bundles < ActiveRecord::Migration[5.1]
   def change
     create_table :stream1_bundles do |t|
-      t.uuid    :uuid,                     null: false
-      t.uuid    :course_uuid,              null: false
-      t.integer :course_event_seqnum_lo,   null: false
-      t.integer :course_event_seqnum_hi,   null: false
-      t.integer :size,                     null: false
-      t.boolean :is_open,                  null: false
+      t.uuid      :uuid,                     null: false
+      t.uuid      :course_uuid,              null: false
+      t.integer   :course_event_seqnum_lo,   null: false
+      t.integer   :course_event_seqnum_hi,   null: false
+      t.integer   :size,                     null: false
+      t.boolean   :is_open,                  null: false
+      t.boolean   :has_been_processed,       null: false
+      t.timestamp :waiting_since,            null: false
 
       t.timestamps null: false
     end
@@ -16,6 +18,10 @@ class CreateStream1Bundles < ActiveRecord::Migration[5.1]
     add_index :stream1_bundles, :course_event_seqnum_lo
 
     add_index :stream1_bundles, :course_event_seqnum_hi
+
+    add_index :stream1_bundles, :has_been_processed
+
+    add_index :stream1_bundles, :waiting_since
 
     add_index :stream1_bundles, [:course_uuid, :course_event_seqnum_lo],
                                 unique: true,
