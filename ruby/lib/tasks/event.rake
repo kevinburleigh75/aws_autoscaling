@@ -191,7 +191,7 @@ module Event
             WHERE needs_attention = TRUE
             AND   uuid_partition(course_uuid) % #{count} = #{modulo}
             ORDER BY waiting_since ASC
-            LIMIT 10
+            LIMIT 20
           )
           ORDER BY course_uuid ASC
           FOR UPDATE
@@ -208,26 +208,6 @@ module Event
         course_uuids       = course_event_states.map(&:course_uuid).uniq.sort
         course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-        # sql_find_and_lock_course_events = %Q{
-        #   SELECT * FROM course_events
-        #   WHERE course_events.event_uuid IN (
-        #     SELECT xx.event_uuid FROM (
-        #       SELECT * FROM course_events
-        #       WHERE course_uuid IN ( #{course_uuid_values} )
-        #       AND has_been_processed_by_stream#{@stream_id} = FALSE
-        #     ) events_oi
-        #     LEFT JOIN LATERAL (
-        #       SELECT * FROM course_events
-        #       WHERE course_uuid = events_oi.course_uuid
-        #       AND has_been_processed_by_stream#{@stream_id} = FALSE
-        #       ORDER BY course_uuid, course_seqnum ASC
-        #       LIMIT 10
-        #     ) xx ON TRUE
-        #   )
-        #   ORDER BY event_uuid ASC
-        #   FOR UPDATE
-        # }.gsub(/\n\s*/, ' ')
-
         sql_find_and_lock_course_events = %Q{
           SELECT * FROM course_events
           WHERE course_events.event_uuid IN (
@@ -241,7 +221,7 @@ module Event
               WHERE event_uuid = events_oi.event_uuid
               AND has_been_processed_by_stream#{@stream_id} = FALSE
               ORDER BY course_uuid, course_seqnum ASC
-              LIMIT 10
+              LIMIT 5
             ) xx ON TRUE
           )
           ORDER BY event_uuid ASC

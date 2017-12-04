@@ -41,12 +41,10 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.datetime "updated_at", null: false
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
     t.index ["course_uuid", "has_been_processed_by_stream1", "course_seqnum"], name: "index_ces_on_cu_hbpbs1_csn"
-    t.index ["course_uuid", "has_been_processed_by_stream2", "course_seqnum"], name: "index_ces_on_cu_hbpbs2_csn"
     t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
+    t.index ["event_uuid", "has_been_processed_by_stream1", "course_seqnum"], name: "index_ces_on_eu_hbpbs1_csn"
     t.index ["has_been_processed_by_stream1", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs1_cu_csn"
     t.index ["has_been_processed_by_stream1"], name: "index_course_events_on_has_been_processed_by_stream1"
-    t.index ["has_been_processed_by_stream2", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs2_cu_csn"
-    t.index ["has_been_processed_by_stream2"], name: "index_course_events_on_has_been_processed_by_stream2"
   end
 
   create_table "protocol_records", force: :cascade do |t|
