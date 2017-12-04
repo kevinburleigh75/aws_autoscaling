@@ -40,6 +40,8 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
+    t.index ["course_uuid", "has_been_processed_by_stream1", "course_seqnum"], name: "index_ces_on_cu_hbpbs1_csn"
+    t.index ["course_uuid", "has_been_processed_by_stream2", "course_seqnum"], name: "index_ces_on_cu_hbpbs2_csn"
     t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
     t.index ["has_been_processed_by_stream1", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs1_cu_csn"
     t.index ["has_been_processed_by_stream1"], name: "index_course_events_on_has_been_processed_by_stream1"
@@ -65,6 +67,8 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.uuid "stream_bundle_uuid", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["course_event_uuid"], name: "index_stream1_bundle_entries_on_course_event_uuid", unique: true
+    t.index ["stream_bundle_uuid"], name: "index_stream1_bundle_entries_on_stream_bundle_uuid"
   end
 
   create_table "stream1_bundle_receipts", force: :cascade do |t|

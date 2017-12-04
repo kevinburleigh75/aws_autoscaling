@@ -6,5 +6,10 @@ class CreateStream1BundleEntries < ActiveRecord::Migration[5.1]
 
       t.timestamps null: false
     end
+
+    add_index :stream1_bundle_entries, :course_event_uuid,
+                                       unique: true
+
+    add_index :stream1_bundle_entries, :stream_bundle_uuid
   end
 end

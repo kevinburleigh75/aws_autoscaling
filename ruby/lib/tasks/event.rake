@@ -148,7 +148,7 @@ module Event
       end
 
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{course_events.size} events in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   create wrote #{course_events.size} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)
@@ -162,18 +162,21 @@ module Event
       @group_uuid = group_uuid
       @stream_id  = stream_id
 
-      @max_bundle_size = 50_000
-      @counter         = 0
+      @max_bundle_size   = 50_000
+      @max_bunele_events = 100
+
+      @counter           = 0
     end
 
     def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info
+      Rails.logger.level = :info #unless modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
 
       start = Time.now
 
+      puts "#{Time.now.utc.iso8601(6)} start of transaction"
       course_events_size = CourseEvent.transaction(isolation: :read_committed) do
         current_time = Time.now
 
@@ -195,7 +198,7 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         course_event_states = CourseEventState.find_by_sql(sql_find_and_lock_course_event_states)
-        puts "#{course_event_states.count} courses need attention"
+        puts "#{Time.now.utc.iso8601(6)} #{course_event_states.count} courses need attention (modulo = #{modulo})"
         next 0 if course_event_states.none?
 
         ##
@@ -204,6 +207,26 @@ module Event
 
         course_uuids       = course_event_states.map(&:course_uuid).uniq.sort
         course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+
+        # sql_find_and_lock_course_events = %Q{
+        #   SELECT * FROM course_events
+        #   WHERE course_events.event_uuid IN (
+        #     SELECT xx.event_uuid FROM (
+        #       SELECT * FROM course_events
+        #       WHERE course_uuid IN ( #{course_uuid_values} )
+        #       AND has_been_processed_by_stream#{@stream_id} = FALSE
+        #     ) events_oi
+        #     LEFT JOIN LATERAL (
+        #       SELECT * FROM course_events
+        #       WHERE course_uuid = events_oi.course_uuid
+        #       AND has_been_processed_by_stream#{@stream_id} = FALSE
+        #       ORDER BY course_uuid, course_seqnum ASC
+        #       LIMIT 10
+        #     ) xx ON TRUE
+        #   )
+        #   ORDER BY event_uuid ASC
+        #   FOR UPDATE
+        # }.gsub(/\n\s*/, ' ')
 
         sql_find_and_lock_course_events = %Q{
           SELECT * FROM course_events
@@ -215,8 +238,7 @@ module Event
             ) events_oi
             LEFT JOIN LATERAL (
               SELECT * FROM course_events
-              WHERE course_uuid = events_oi.course_uuid
-              AND has_been_processed_by_stream#{@stream_id} = FALSE
+              WHERE event_uuid = events_oi.event_uuid
               ORDER BY course_uuid, course_seqnum ASC
               LIMIT 10
             ) xx ON TRUE
@@ -226,7 +248,7 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         course_events = CourseEvent.find_by_sql(sql_find_and_lock_course_events)
-        puts course_events.size
+        puts "#{Time.now.utc.iso8601(6)} #{course_events.size}"
 
         ##
         ## Find the currently open bundles for the target stream.
@@ -255,17 +277,17 @@ module Event
           gap_found              = false
           new_last_course_seqnum = event_state.last_course_seqnum
 
-          puts "  processing course #{event_state.course_uuid}"
+          puts "#{Time.now.utc.iso8601(6)}  processing course #{event_state.course_uuid}"
           target_course_activity = false
           target_events.each do |event|
-            puts "    course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_type} #{event.event_uuid}"
+            puts "#{Time.now.utc.iso8601(6)}    course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_type} #{event.event_uuid}"
 
             ##
             ## If the event causes a gap, stop processing events for the target course.
             ##
 
             if event.course_seqnum != new_last_course_seqnum + 1
-              puts "      gap found"
+              puts "#{Time.now.utc.iso8601(6)}      gap found"
               gap_found = true
               break
             end
@@ -280,7 +302,9 @@ module Event
 
             event_size = Event::event_data_by_type[event.event_type.to_sym][:size]
 
-            if cur_stream_open_bundle && (cur_stream_open_bundle.size + event_size > @max_bundle_size)
+            if cur_stream_open_bundle &&
+               ( (cur_stream_open_bundle.size + event_size > @max_bundle_size) ||
+                 (cur_stream_open_bundle.course_event_seqnum_hi - cur_stream_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
               cur_stream_open_bundle.is_open = false
               cur_stream_open_bundle.save!
               cur_stream_open_bundle = nil
@@ -302,14 +326,13 @@ module Event
               cur_stream_open_bundle.size                   += event_size
             end
 
-            if cur_stream_open_bundle.size >= @max_bundle_size
+            if ( (cur_stream_open_bundle.size >= @max_bundle_size) ||
+                 (cur_stream_open_bundle.course_event_seqnum_hi - cur_stream_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
               cur_stream_open_bundle.is_open = false
             end
 
             cur_stream_open_bundle.has_been_processed = false
             cur_stream_open_bundle.waiting_since      = current_time
-
-            cur_stream_open_bundle.save!
 
             ##
             ## Create a bundle entry for this event/stream combo.
@@ -328,7 +351,12 @@ module Event
             event.save!
           end
 
+          puts "#{Time.now.utc.iso8601(6)} saving cur_stream_open_bundle = #{cur_stream_open_bundle}"
+          cur_stream_open_bundle.save! if cur_stream_open_bundle
+
           if target_course_activity
+            puts "#{Time.now.utc.iso8601(6)} there was target activity for course #{event_state.course_uuid}"
+
             ##
             ## Update the stream's course bundle state, if appropriate.
             ##
@@ -341,10 +369,9 @@ module Event
 
             bundle_state = Object.const_get("Stream#{@stream_id}CourseBundleState").find_by_sql(sql_find_and_lock_stream_course_bundle_state).first
 
-            if not bundle_state.needs_attention
+            if !bundle_state.needs_attention
               bundle_state.needs_attention = true
               bundle_state.waiting_since   = current_time
-
               bundle_state.save!
             end
 
@@ -355,24 +382,25 @@ module Event
             sql_find_and_lock_stream_client_state = %Q{
               SELECT * FROM stream#{@stream_id}_client_states
               WHERE course_uuid = '#{event_state.course_uuid}'
-              ORDER BY client_uuid ASC
+              ORDER BY course_uuid ASC
               FOR UPDATE
             }.gsub(/\n\s*/, ' ')
 
             client_states = Object.const_get("Stream#{@stream_id}ClientState").find_by_sql(sql_find_and_lock_stream_client_state)
 
             client_states.each do |client_state|
-              if not client_state.needs_attention
+              puts "#{Time.now.utc.iso8601(6)}    updating na #{client_state.needs_attention} client #{client_state.client_uuid} course #{client_state.course_uuid}"
+              if !client_state.needs_attention
+                puts "#{Time.now.utc.iso8601(6)}      setting needs_attention to true"
                 client_state.needs_attention = true
                 client_state.waiting_since   = current_time
-
                 client_state.save!
               end
             end
           end
 
           if (target_events.count < 10) or gap_found
-            puts "    course does not need further attention"
+            puts "#{Time.now.utc.iso8601(6)}    event state does not need further attention"
             event_state.needs_attention = false
           end
 
@@ -384,9 +412,10 @@ module Event
 
         course_events.size
       end
-
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{course_events_size} events in #{'%1.3e' % elapsed} sec"
+      puts "#{Time.now.utc.iso8601(6)} end of transaction elasped = #{'%1.3e' % elapsed}"
+
+      Rails.logger.info "   bundle wrote #{course_events_size} events in #{'%1.3e' % elapsed} sec #{elapsed > 0.5 ? 'OVER' : ''}"
     end
 
     def do_boss(count:, modulo:, protocol:)
@@ -465,7 +494,7 @@ module Event
       end
 
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{receipts_size} events in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   receipt wrote #{receipts_size} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)
@@ -510,7 +539,7 @@ module Event
     end
 
     def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info
+      Rails.logger.level = :info unless modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
@@ -518,6 +547,7 @@ module Event
       start = Time.now
 
       if Time.now > @next_course_check_time
+        puts "#{Time.now.utc.iso8601(6)} starting course check transaction"
         ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
           ##
           ## Create client states for any missing courses.
@@ -528,8 +558,8 @@ module Event
             WHERE course_uuid NOT IN (
               SELECT course_uuid FROM stream1_client_states
               WHERE client_uuid = '#{@client_uuid}'
-              LIMIT 1000
             )
+            AND uuid_partition(course_uuid) % #{count} = #{modulo}
           }.gsub(/\n\s*/, ' ')
 
           course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
@@ -549,38 +579,15 @@ module Event
 
           Stream1ClientState.import client_states
         end
+        elapsed = Time.now - start
+        puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
 
         @next_course_check_time += (2.5 + 5*Kernel.rand).seconds
       end
 
+      puts "#{Time.now.utc.iso8601(6)} starting transaction"
       ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
         current_time = Time.now
-
-        ##
-        ## - find the events
-        ##   - for the bundle entry event_uuids
-        ##     - for
-        ##
-        # sql_find_stream_bundles = %Q{
-        #   SELECT * FROM stream#{@stream_id}_bundles
-        #   WHERE uuid IN (
-        #     SELECT xx.uuid FROM (
-        #       SELECT * FROM stream#{@stream_id}_client_states
-        #       WHERE needs_attention = TRUE
-        #       AND client_uuid = '#{@client_uuid}'
-        #       AND uuid_partition(course_uuid) % #{count} = #{modulo}
-        #     ) client_states_oi
-        #     LEFT JOIN LATERAL (
-        #       SELECT uuid FROM stream#{@stream_id}_bundles
-        #       WHERE uuid = client_states_oi.course_uuid
-        #       AND course_event_seqnum_hi >= client_states_oi.last_confirmed_course_seqnum
-        #       ORDER BY course_event_seqnum_hi ASC
-        #       LIMIT 1
-        #     ) xx ON TRUE
-        #     ORDER BY waiting_since ASC
-        #     LIMIT 10
-        #   )
-        # }.gsub(/\n\s*/, ' ')
 
         sql_find_and_lock_stream_client_states = %Q{
           SELECT * FROM stream#{@stream_id}_client_states
@@ -592,13 +599,16 @@ module Event
             ORDER BY waiting_since ASC
             LIMIT 10
           )
+          AND client_uuid = '#{@client_uuid}'
           ORDER BY course_uuid ASC
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
         stream_client_states = Stream1ClientState.find_by_sql(sql_find_and_lock_stream_client_states)
-        puts "#{stream_client_states.count} courses need attention from client #{@client_name} #{@client_uuid}"
+        puts "#{Time.now.utc.iso8601(6)} #{stream_client_states.count} courses need attention from client #{@client_name} #{modulo} #{@client_uuid}"
         next 0 if stream_client_states.none?
+
+        stream_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
 
         ##
         ## For each state (course) of interest, find the next bundle for this client.
@@ -626,26 +636,78 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         stream_bundles = Stream1Bundle.find_by_sql(sql_find_stream_bundles)
-        puts "found #{stream_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
+        puts "#{Time.now.utc.iso8601(6)} found #{stream_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
+
+        if stream_bundles.any?
+          ##
+          ## Find the events associated with the bundles.
+          ##
+
+          bundle_uuids       = stream_bundles.map(&:uuid).sort
+          bundle_uuid_values = bundle_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+
+          sql_find_course_events = %Q{
+            SELECT * FROM course_events
+            WHERE event_uuid IN (
+              SELECT course_event_uuid FROM stream#{@stream_id}_bundle_entries
+              WHERE stream_bundle_uuid in ( #{bundle_uuid_values} )
+            )
+          }.gsub(/\n\s*/, ' ')
+
+          course_events = CourseEvent.find_by_sql(sql_find_course_events)
+                                     .select{ |event|
+                                       last_confirmed_course_seqnum = stream_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
+                                       event.course_seqnum > last_confirmed_course_seqnum
+                                      }
+
+          puts "#{Time.now.utc.iso8601(6)} found #{course_events.count} course events"
+
+          now = Time.now
+          delays = course_events.group_by{|event| event.course_uuid}
+                                .each{ |course_uuid, events|
+                                  puts "events for course #{course_uuid}:"
+                                  events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
+                                }
+          delays = course_events.group_by{|event| event.course_uuid}
+                                .map{ |course_uuid, events|
+                                  dels = events.map(&:created_at).map{|ca| now - ca}
+                                  [dels.min, dels.max]
+                                }
+          min_delay = delays.map{|dd| dd[0]}.min
+          max_delay = delays.map{|dd| dd[1]}.max
+          puts "#{Time.now.utc.iso8601(6)} min,max delay = %+1.3e,%1.3e" % [min_delay, max_delay]
+          ## TODO: filter down the events based on the last_confirmed_course_event_seqnum per course
+        end
+
+        puts "#{Time.now.utc.iso8601(6)} finished processing stream bundles"
 
         ##
         ## Update client states.
         ##
 
         stream_client_states.each do |client_state|
+          puts "#{Time.now.utc.iso8601(6)} updating client state for course #{client_state.course_uuid}"
+
           bundles = stream_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
+                                  .sort_by{|bundle| bundle.course_event_seqnum_hi}
+
+          puts "#{Time.now.utc.iso8601(6)}   #{bundles.count} bundles"
 
           client_state.waiting_since   = current_time
-          client_state.needs_attention = bundles.count > 1
+          client_state.needs_attention = (bundles.count > 1) ## FOR DEMO PURPOSES ONLY
           if bundles.any?
+            puts "#{Time.now.utc.iso8601(6)}   bundles[0] course_event_seqnum_hi = #{bundles[0].course_event_seqnum_hi}"
             client_state.last_confirmed_course_seqnum = bundles[0].course_event_seqnum_hi ## FOR DEMO PURPOSES ONLY
           end
           client_state.save!
         end
-      end
 
+        puts "#{Time.now.utc.iso8601(6)} finished processing client states"
+      end
       elapsed = Time.now - start
-      Rails.logger.info "   wrote #{0} events in #{'%1.3e' % elapsed} sec"
+
+      puts "#{Time.now.utc.iso8601(6)} finished transaction elapsed = #{'%1.3e' % elapsed}"
+      Rails.logger.info "   fetch wrote #{0} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)
