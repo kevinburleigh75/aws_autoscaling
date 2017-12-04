@@ -191,7 +191,7 @@ module Event
             WHERE needs_attention = TRUE
             AND   uuid_partition(course_uuid) % #{count} = #{modulo}
             ORDER BY waiting_since ASC
-            LIMIT 20
+            LIMIT 10
           )
           ORDER BY course_uuid ASC
           FOR UPDATE
@@ -213,15 +213,15 @@ module Event
           WHERE course_events.event_uuid IN (
             SELECT xx.event_uuid FROM (
               SELECT * FROM course_events
-              WHERE course_uuid IN ( #{course_uuid_values} )
-              AND has_been_processed_by_stream#{@stream_id} = FALSE
+              WHERE has_been_processed_by_stream#{@stream_id} = FALSE
+              AND course_uuid IN ( #{course_uuid_values} )
             ) events_oi
             LEFT JOIN LATERAL (
               SELECT * FROM course_events
               WHERE event_uuid = events_oi.event_uuid
               AND has_been_processed_by_stream#{@stream_id} = FALSE
               ORDER BY course_uuid, course_seqnum ASC
-              LIMIT 5
+              LIMIT 1
             ) xx ON TRUE
           )
           ORDER BY event_uuid ASC
