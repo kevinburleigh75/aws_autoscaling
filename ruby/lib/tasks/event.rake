@@ -169,7 +169,7 @@ module Event
     end
 
     def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info #unless modulo == 0
+      Rails.logger.level = :info unless modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
@@ -239,6 +239,7 @@ module Event
             LEFT JOIN LATERAL (
               SELECT * FROM course_events
               WHERE event_uuid = events_oi.event_uuid
+              AND has_been_processed_by_stream#{@stream_id} = FALSE
               ORDER BY course_uuid, course_seqnum ASC
               LIMIT 10
             ) xx ON TRUE
@@ -539,7 +540,7 @@ module Event
     end
 
     def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info unless modulo == 0
+      Rails.logger.level = :info #unless modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
