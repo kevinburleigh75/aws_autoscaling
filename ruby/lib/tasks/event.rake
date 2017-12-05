@@ -136,15 +136,11 @@ module Event
         ## Update and save the course states
         ##
 
-        time = Time.now
+        states_to_update = course_event_states.select{|state| seqnums_by_course_uuid[state.course_uuid].has_key?(1 + state.last_course_seqnum)}
+                                              .select{|state| state.needs_attention == false}
 
-        course_event_states.each do |state|
-          if seqnums_by_course_uuid[state.course_uuid].has_key?(1 + state.last_course_seqnum)
-            state.needs_attention = true
-            state.waiting_since   = time
-            state.save!
-          end
-        end
+        CourseEventState.where(course_uuid: states_to_update.map(&:course_uuid))
+                        .update_all(needs_attention: true, waiting_since: Time.now)
       end
 
       elapsed = Time.now - start
