@@ -14,6 +14,9 @@ class CreateCourseEvents < ActiveRecord::Migration[5.1]
       t.timestamps null: false
     end
 
+    add_index :course_events, :event_uuid,
+                              unique: true
+
     add_index :course_events, [:course_uuid, :course_seqnum],
                               unique: true
 

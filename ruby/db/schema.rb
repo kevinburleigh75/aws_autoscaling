@@ -43,6 +43,7 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.index ["course_uuid", "has_been_processed_by_stream1", "course_seqnum"], name: "index_ces_on_cu_hbpbs1_csn"
     t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
     t.index ["event_uuid", "has_been_processed_by_stream1", "course_seqnum"], name: "index_ces_on_eu_hbpbs1_csn"
+    t.index ["event_uuid"], name: "index_course_events_on_event_uuid", unique: true
     t.index ["has_been_processed_by_stream1", "course_uuid", "course_seqnum"], name: "index_ce_on_hbpbs1_cu_csn"
     t.index ["has_been_processed_by_stream1"], name: "index_course_events_on_has_been_processed_by_stream1"
   end
@@ -95,6 +96,7 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.index ["course_uuid", "course_event_seqnum_lo"], name: "index_s1bs_on_cu_cesl", unique: true
     t.index ["course_uuid"], name: "index_stream1_bundles_on_course_uuid"
     t.index ["has_been_processed"], name: "index_stream1_bundles_on_has_been_processed"
+    t.index ["uuid"], name: "index_stream1_bundles_on_uuid", unique: true
     t.index ["waiting_since"], name: "index_stream1_bundles_on_waiting_since"
   end
 
