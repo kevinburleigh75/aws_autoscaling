@@ -427,7 +427,7 @@ module Event
               if !client_state.needs_attention
                 puts "#{Time.now.utc.iso8601(6)}        client #{client_state.client_uuid} now needs attention"
                 client_state.needs_attention = true
-                client_state.waiting_since   = current_time
+                client_state.waiting_since   = Time.now
               else
                 puts "#{Time.now.utc.iso8601(6)}        client #{client_state.client_uuid} already needs attention"
               end
@@ -492,270 +492,6 @@ module Event
       puts "#{Time.now.utc.iso8601(6)} end of transaction elasped = #{'%1.3e' % elapsed}"
 
       Rails.logger.info "   bundle processed #{course_events_size} events in #{'%1.3e' % elapsed} sec #{elapsed > 0.5 ? 'OVER' : ''}"
-    end
-      #   course_event_states.each do |event_state|
-      #     target_events = course_events.select{|event| event.course_uuid == event_state.course_uuid}
-      #                                  .sort_by{|event| event.course_seqnum}
-
-      #     cur_stream_open_bundle = stream_bundles.detect{|bundle| bundle.course_uuid == event_state.course_uuid}
-
-      #     gap_found              = false
-      #     new_last_course_seqnum = event_state.last_course_seqnum
-
-      #     puts "#{Time.now.utc.iso8601(6)}  processing course #{event_state.course_uuid}"
-      #     target_course_activity = false
-      #     target_events.each do |event|
-      #       puts "#{Time.now.utc.iso8601(6)}    course #{event.course_uuid} seqnum #{new_last_course_seqnum} event #{event.course_seqnum} #{event.event_type} #{event.event_uuid}"
-
-      #       ##
-      #       ## If the event causes a gap, stop processing events for the target course.
-      #       ##
-
-      #       if event.course_seqnum != new_last_course_seqnum + 1
-      #         puts "#{Time.now.utc.iso8601(6)}      gap found"
-      #         gap_found = true
-      #         break
-      #       end
-
-      #       ##
-      #       ## Add the event to the currently open bundle, if possible.
-      #       ## If not, close the old bundle and create a new bundle for it.
-      #       ##
-
-      #       target_course_activity  = true
-      #       new_last_course_seqnum += 1
-
-      #       event_size = Event::event_data_by_type[event.event_type.to_sym][:size]
-
-      #       if cur_stream_open_bundle &&
-      #          ( (cur_stream_open_bundle.size + event_size > @max_bundle_size) ||
-      #            (cur_stream_open_bundle.course_event_seqnum_hi - cur_stream_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
-      #         cur_stream_open_bundle.is_open = false
-      #         bundles_to_create_or_update << cur_stream_open_bundle
-      #         cur_stream_open_bundle = nil
-      #       end
-
-      #       if cur_stream_open_bundle.nil?
-      #         cur_stream_open_bundle = Object.const_get("Stream#{@stream_id}Bundle").new(
-      #           uuid:                   SecureRandom.uuid.to_s,
-      #           course_uuid:            event_state.course_uuid,
-      #           course_event_seqnum_lo: event.course_seqnum,
-      #           course_event_seqnum_hi: event.course_seqnum,
-      #           size:                   event_size,
-      #           is_open:                true,
-      #           has_been_processed:     false,
-      #           waiting_since:          current_time,
-      #         )
-      #       else
-      #         cur_stream_open_bundle.course_event_seqnum_hi  = event.course_seqnum
-      #         cur_stream_open_bundle.size                   += event_size
-      #       end
-
-      #       if ( (cur_stream_open_bundle.size >= @max_bundle_size) ||
-      #            (cur_stream_open_bundle.course_event_seqnum_hi - cur_stream_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
-      #         cur_stream_open_bundle.is_open = false
-      #       end
-
-      #       cur_stream_open_bundle.has_been_processed = false
-      #       cur_stream_open_bundle.waiting_since      = current_time
-
-      #       ##
-      #       ## Create a bundle entry for this event/stream combo.
-      #       ##
-
-      #       bundle_entries_to_create << Stream1BundleEntry.new(
-      #         course_event_uuid:  event.event_uuid,
-      #         stream_bundle_uuid: cur_stream_open_bundle.uuid,
-      #       )
-
-      #       ##
-      #       ## Update the event to show that it's been processed by the current stream.
-      #       ##
-
-      #       events_to_update << event
-      #     end
-
-      #     puts "#{Time.now.utc.iso8601(6)} saving cur_stream_open_bundle = #{cur_stream_open_bundle}"
-      #     bundles_to_create_or_update << cur_stream_open_bundle if cur_stream_open_bundle
-
-      #     if target_course_activity
-      #       puts "#{Time.now.utc.iso8601(6)} there was target activity for course #{event_state.course_uuid}"
-
-      #       ##
-      #       ## Update the stream's course bundle state, if appropriate.
-      #       ##
-
-      #       sql_find_and_lock_stream_course_bundle_state = %Q{
-      #         SELECT * FROM stream#{@stream_id}_course_bundle_states
-      #         WHERE course_uuid = '#{event_state.course_uuid}'
-      #         FOR UPDATE
-      #       }.gsub(/\n\s*/, ' ')
-
-      #       bundle_state = Object.const_get("Stream#{@stream_id}CourseBundleState").find_by_sql(sql_find_and_lock_stream_course_bundle_state).first
-
-      #       if !bundle_state.needs_attention
-      #         bundle_state.needs_attention = true
-      #         bundle_state.waiting_since   = current_time
-      #         bundle_states_to_update << bundle_state
-      #       end
-
-      #       ##
-      #       ## Update the stream's client states, if appropriate
-      #       ##
-
-      #       sql_find_and_lock_stream_client_state = %Q{
-      #         SELECT * FROM stream#{@stream_id}_client_states
-      #         WHERE course_uuid = '#{event_state.course_uuid}'
-      #         ORDER BY course_uuid ASC
-      #         FOR UPDATE
-      #       }.gsub(/\n\s*/, ' ')
-
-      #       client_states = Object.const_get("Stream#{@stream_id}ClientState").find_by_sql(sql_find_and_lock_stream_client_state)
-
-      #       client_states.each do |client_state|
-      #         puts "#{Time.now.utc.iso8601(6)}    updating na #{client_state.needs_attention} client #{client_state.client_uuid} course #{client_state.course_uuid}"
-      #         if !client_state.needs_attention
-      #           puts "#{Time.now.utc.iso8601(6)}      setting needs_attention to true"
-      #           client_state.needs_attention = true
-      #           client_state.waiting_since   = current_time
-      #           client_states_to_update << client_state
-      #         end
-      #       end
-      #     end
-
-      #     if (target_events.count < 2) or gap_found
-      #       puts "#{Time.now.utc.iso8601(6)}    event state does not need further attention"
-      #       event_state.needs_attention = false
-      #     end
-
-      #     event_state.last_course_seqnum = new_last_course_seqnum
-      #     event_state.waiting_since      = Time.now
-      #   end
-
-      #   Stream1BundleEntry.import bundle_entries_to_create
-
-      #   Stream1Bundle.import(
-      #     bundles_to_create_or_update,
-      #     on_duplicate_key_update: {
-      #       conflict_target: [:uuid],
-      #       columns:         Stream1Bundle.column_names - ['updated_at', 'created_at']
-      #     }
-      #   )
-
-      #   Stream1CourseBundleState.import(
-      #     bundle_states_to_update,
-      #     on_duplicate_key_update: {
-      #       conflict_target: [:course_uuid],
-      #       columns:         Stream1CourseBundleState.column_names - ['updated_at', 'created_at']
-      #     }
-      #   )
-
-      #   CourseEvent.where(event_uuid: events_to_update.map(&:event_uuid))
-      #              .update_all(
-      #                 has_been_processed_by_stream1: true,
-      #                 updated_at:                    Time.now
-      #               )
-
-      #   CourseEventState.import(
-      #     course_event_states,
-      #     on_duplicate_key_update: {
-      #       conflict_target: [:course_uuid],
-      #       columns: CourseEventState.column_names - ['updated_at', 'created_at']
-      #     }
-      #   )
-
-      #   Stream1ClientState.import(
-      #     client_states_to_update,
-      #     on_duplicate_key_update: {
-      #       conflict_target: [:client_uuid, :course_uuid],
-      #       columns: Stream1ClientState.column_names - ['updated_at', 'created_at']
-      #     }
-      #   )
-      #   course_events.size
-      # end
-      # elapsed = Time.now - start
-      # puts "#{Time.now.utc.iso8601(6)} end of transaction elasped = #{'%1.3e' % elapsed}"
-
-      # Rails.logger.info "   bundle wrote #{course_events_size} events in #{'%1.3e' % elapsed} sec #{elapsed > 0.5 ? 'OVER' : ''}"
-    # end
-
-    def do_boss(count:, modulo:, protocol:)
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
-      # sleep(0.05)
-    end
-  end
-
-  class ReceiptWorker
-    def initialize(group_uuid:, stream_id:)
-      @group_uuid = group_uuid
-      @stream_id  = stream_id
-
-      @counter = 0
-    end
-
-    def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info
-
-      @counter += 1
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
-
-      start = Time.now
-
-      receipts_size = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-
-        ##
-        ## Get the target course bundle states.
-        ##
-
-        sql_find_and_lock_stream_course_bundle_states = %Q{
-          SELECT * FROM stream#{@stream_id}_course_bundle_states
-          WHERE course_uuid IN (
-            SELECT course_uuid FROM stream#{@stream_id}_course_bundle_states
-            WHERE needs_attention = TRUE
-            AND uuid_partition(course_uuid) % #{count} = #{modulo}
-            ORDER BY waiting_since ASC
-            LIMIT 10
-          )
-          ORDER BY course_uuid ASC
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        stream_course_bundle_states = Object.const_get("Stream#{@stream_id}CourseBundleState").find_by_sql(sql_find_and_lock_stream_course_bundle_states)
-
-        puts "#{stream_course_bundle_states.size} courses need attention"
-        next 0 if stream_course_bundle_states.none?
-
-        # ##
-        # ## Find and lock the bundles that need new/updated receipts.
-        # ##
-
-        # sql_find_and_lock_stream_bundles = %Q{
-        #   SELECT * FROM stream#{@stream_id}_bundles
-        #   WHERE is_open = TRUE
-        #   AND course_uuid IN ( #{course_uuid_values} )
-        #   ORDER BY uuid ASC
-        #   FOR UPDATE
-        # }.gsub(/\n\s*/, ' ')
-
-        # stream_bundles = Object.const_get("Stream#{@stream_id}Bundle").find_by_sql(sql_find_and_lock_stream_bundles)
-
-        # ##
-        # ## Load the list of stream clients.
-        # ##
-
-        # sql_find_and_lock_stream_clients = %Q{
-        #   SELECT * FROM stream#{@stream_id}_clients
-        #   ORDER BY uuid ASC
-        #   FOR UPDATE
-        # }.gsub(/\n\s*/, ' ')
-
-        # stream_clients = Object.const_get("Stream#{@stream_id}Client").find_by_sql(sql_find_and_lock_stream_clients)
-
-        stream_course_bundle_states.size
-      end
-
-      elapsed = Time.now - start
-      Rails.logger.info "   receipt wrote #{receipts_size} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)
@@ -847,8 +583,12 @@ module Event
       end
 
       puts "#{Time.now.utc.iso8601(6)} starting transaction"
-      ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+      num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
         current_time = Time.now
+
+        ##
+        ## Find and lock the client states needing attention.
+        ##
 
         sql_find_and_lock_stream_client_states = %Q{
           SELECT * FROM stream#{@stream_id}_client_states
@@ -899,6 +639,7 @@ module Event
         stream_bundles = Stream1Bundle.find_by_sql(sql_find_stream_bundles)
         puts "#{Time.now.utc.iso8601(6)} found #{stream_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
 
+        num_processed_events = 0
         if stream_bundles.any?
           ##
           ## Find the events associated with the bundles.
@@ -924,20 +665,25 @@ module Event
           puts "#{Time.now.utc.iso8601(6)} found #{course_events.count} course events"
 
           now = Time.now
-          delays = course_events.group_by{|event| event.course_uuid}
-                                .each{ |course_uuid, events|
-                                  puts "events for course #{course_uuid}:"
-                                  events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
-                                }
-          delays = course_events.group_by{|event| event.course_uuid}
-                                .map{ |course_uuid, events|
-                                  dels = events.map(&:created_at).map{|ca| now - ca}
-                                  [dels.min, dels.max]
-                                }
+
+          course_events.group_by{ |event|
+            event.course_uuid
+          }.each{ |course_uuid, events|
+            puts "events for course #{course_uuid}:"
+            events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
+          }
+
+          delays = course_events.group_by{ |event|
+            event.course_uuid
+          }.map{ |course_uuid, events|
+            dels = events.map(&:created_at).map{|ca| now - ca}
+            [dels.min, dels.max]
+          }
           min_delay = delays.map{|dd| dd[0]}.min
           max_delay = delays.map{|dd| dd[1]}.max
           puts "#{Time.now.utc.iso8601(6)} min,max delay = %+1.3e,%1.3e" % [min_delay, max_delay]
-          ## TODO: filter down the events based on the last_confirmed_course_event_seqnum per course
+
+          num_processed_events = course_events.count
         end
 
         puts "#{Time.now.utc.iso8601(6)} finished processing stream bundles"
@@ -960,15 +706,24 @@ module Event
             puts "#{Time.now.utc.iso8601(6)}   bundles[0] course_event_seqnum_hi = #{bundles[0].course_event_seqnum_hi}"
             client_state.last_confirmed_course_seqnum = bundles[0].course_event_seqnum_hi ## FOR DEMO PURPOSES ONLY
           end
-          client_state.save!
         end
 
+        Stream1ClientState.import(
+          stream_client_states,
+          on_duplicate_key_update: {
+            conflict_target: [:course_uuid, :client_uuid],
+            columns:         Stream1ClientState.column_names - ['updated_at', 'created_at']
+          }
+        )
+
         puts "#{Time.now.utc.iso8601(6)} finished processing client states"
+
+        num_processed_events
       end
       elapsed = Time.now - start
 
       puts "#{Time.now.utc.iso8601(6)} finished transaction elapsed = #{'%1.3e' % elapsed}"
-      Rails.logger.info "   fetch wrote #{0} events in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(count:, modulo:, protocol:)
@@ -1025,39 +780,6 @@ namespace :event do
     stream_id           = args[:stream_id]
 
     worker = Event::BundleWorker.new(
-      group_uuid: group_uuid,
-      stream_id:  stream_id,
-    )
-
-    protocol = Protocol.new(
-      min_work_interval:  work_interval,
-      min_boss_interval:  boss_interval,
-      work_modulo:        work_modulo,
-      work_offset:        work_offset,
-      group_uuid:         group_uuid,
-      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
-                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
-                  },
-      boss_block: lambda { |instance_count:, instance_modulo:, protocol:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo, protocol: protocol)
-                  }
-    )
-
-    protocol.run
-  end
-end
-
-namespace :event do
-  desc 'create missing client receipts'
-  task :receipt, [:group_uuid, :work_interval, :work_modulo, :work_offset, :stream_id] => :environment do |t, args|
-    group_uuid          = args[:group_uuid]
-    work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
-    boss_interval       = Rails.env.production? ? 30.seconds : 5.seconds
-    work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
-    work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
-    stream_id           = args[:stream_id]
-
-    worker = Event::ReceiptWorker.new(
       group_uuid: group_uuid,
       stream_id:  stream_id,
     )
