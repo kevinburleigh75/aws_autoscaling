@@ -6,178 +6,166 @@ class TestBlock
   attr_accessor :target_num_calls
   attr_accessor :call_times
 
-  def initialize
+  def initialize(call_block: lambda{|block| block.call_count == block.target_num_calls})
     @target_num_calls = -1
     @call_count       =  0
     @call_times       = []
+    @call_block       = call_block
   end
 
   def call
     self.call_times << Time.now()
     self.call_count += 1
 
-    self.call_count == self.target_num_calls
+    @call_block.call(self)
   end
 end
 
 RSpec.describe 'protocol' do
-  let(:min_end_interval) { 0.1.seconds }
-
-  let(:end_block) { lambda{ } }
-
-
-  let(:protocol) {
-    Protocol.new(
-      min_end_interval: min_end_interval,
-      end_block:        end_block,
-    )
-  }
 
   context '.run' do
     context 'termination' do
-      let(:end_block) {
-        dbl = TestBlock.new
-        allow(dbl).to receive(:call).and_call_original
-        dbl
-      }
+      context 'no end_block is given' do
+        let(:protocol) {
+          Protocol.new
+        }
 
-      let(:min_end_interval) { 0.05.seconds }
-
-      context '.run continues until end_block returns truthy' do
-        it 'should run until end_block returns truthy' do
-          end_block.target_num_calls = 3
-          Timeout.timeout(1.seconds) {
-            protocol.run
-          }
-          expect(end_block).to have_received(:call).exactly(3).times
+        context '.run loops forever' do
+          it 'should pass' do
+            expect {
+              Timeout.timeout(2.seconds) {
+                protocol.run
+              }
+            }.to raise_error(Timeout::Error);
+          end
         end
       end
 
-      it 'should call end_block about once per min_end_interval' do
-        end_block.target_num_calls = 10
+      context 'end_block is given' do
+        let(:min_end_interval) { 0.05.seconds }
 
-        Timeout.timeout(2.seconds) {
-          protocol.run
+        let(:end_block) {
+          dbl = TestBlock.new
+          allow(dbl).to receive(:call).and_call_original
+          dbl
         }
 
-        deltas = end_block.call_times.each_cons(2).map{ |t1, t2| t2 - t1 }
-        delta_mean = deltas.sum/deltas.size
-        delta_std  = Math.sqrt(deltas.inject(0){ |result, val|
-          result += (val - delta_mean)**2
-          result
-        }/(deltas.size-1))
+        let(:protocol) {
+          Protocol.new(
+            min_end_interval: min_end_interval,
+            end_block:        end_block,
+          )
+        }
 
-        expect(end_block.call_count).to equal(10)
-        expect(delta_mean).to be_within(0.01).of(min_end_interval)
-        expect(delta_std).to be <= 0.01
+        context '.run continues until end_block returns truthy' do
+          it 'should pass' do
+            end_block.target_num_calls = 3
+            Timeout.timeout(1.seconds) {
+              protocol.run
+            }
+            expect(end_block).to have_received(:call).exactly(3).times
+          end
+        end
+      end
+    end
+
+    context 'block timing' do
+      context 'when end, boss, and work blocks are given' do
+        let(:min_boss_interval) { 0.07654.seconds }
+
+        let(:boss_block) {
+          dbl = TestBlock.new
+          allow(dbl).to receive(:call).and_call_original
+          dbl
+        }
+
+        let(:min_work_interval) { 0.04321.seconds }
+
+        let(:work_block) {
+          dbl = TestBlock.new
+          allow(dbl).to receive(:call).and_call_original
+          dbl
+        }
+
+        let(:min_end_interval) { 0.02345.seconds }
+
+        let(:end_block) {
+          dbl = TestBlock.new(call_block: lambda{ |block|
+            (block.call_count >= 10) && (boss_block.call_count >= 10) && (work_block.call_count >= 10)
+          })
+          allow(dbl).to receive(:call).and_call_original
+          dbl
+        }
+
+        let(:protocol) {
+          Protocol.new(
+            min_end_interval:  min_end_interval,
+            end_block:         end_block,
+            min_boss_interval: min_boss_interval,
+            boss_block:        boss_block,
+            min_work_interval: min_work_interval,
+            work_block:        work_block,
+          )
+        }
+
+        context '.run calls end_block about once per min_end_interval' do
+          it 'should pass' do
+            Timeout.timeout(2.seconds) {
+              protocol.run
+            }
+
+            deltas = end_block.call_times.each_cons(2).map{|t1, t2| t2 - t1}
+            delta_mean = deltas.sum/[deltas.size,1].max
+            delta_std  = Math.sqrt(deltas.inject(0){ |result, val|
+              result += (val - delta_mean)**2
+              result
+            })/[deltas.size-1,1].max
+
+            expect(end_block.call_count).to  be >= 10
+            expect(delta_mean).to be_within(0.01).of(min_end_interval)
+            expect(delta_std).to be <= 0.01
+          end
+        end
+
+        context '.run calls boss_block about once per min_boss_interval' do
+          it 'should pass' do
+            Timeout.timeout(2.seconds) {
+              protocol.run
+            }
+
+            deltas = boss_block.call_times.each_cons(2).map{|t1, t2| t2 - t1}
+            delta_mean = deltas.sum/[deltas.size,1].max
+            delta_std  = Math.sqrt(deltas.inject(0){ |result, val|
+              result += (val - delta_mean)**2
+              result
+            })/[deltas.size-1,1].max
+
+            expect(boss_block.call_count).to  be >= 10
+            expect(delta_mean).to be_within(0.01).of(min_boss_interval)
+            expect(delta_std).to be <= 0.01
+          end
+        end
+
+        context '.run calls work_block about once per min_work_interval' do
+          it 'should pass' do
+            Timeout.timeout(2.seconds) {
+              protocol.run
+            }
+
+            deltas = work_block.call_times.each_cons(2).map{|t1, t2| t2 - t1}
+            delta_mean = deltas.sum/[deltas.size,1].max
+            delta_std  = Math.sqrt(deltas.inject(0){ |result, val|
+              result += (val - delta_mean)**2
+              result
+            })/[deltas.size-1,1].max
+
+            expect(work_block.call_count).to  be >= 10
+            expect(delta_mean).to be_within(0.01).of(min_work_interval)
+            expect(delta_std).to be <= 0.01
+          end
+        end
+
       end
     end
   end
 end
-
-# RSpec.describe 'protocol' do
-#   context 'basic construction' do
-#     it 'should work' do
-#       Protocol.new(
-#         group_uuid: SecureRandom.uuid.to_s,
-#         work_modulo:         1.0.seconds,
-#         work_offset:         0.0.seconds,
-#         min_work_interval:   0.1.seconds,
-#         min_boss_interval:   0.3.seconds,
-#         min_end_interval:    0.1.seconds,
-#         min_update_interval: 0.05.seconds,
-#         work_block: lambda{|instance_count, instance_modulo, am_boss| },
-#         boss_block: lambda{|instance_count, instance_modulo, am_boss| },
-#         end_block:  lambda{ },
-#       )
-#     end
-#   end
-
-#   context '.run' do
-#     let(:group_uuid)  { SecureRandom.uuid.to_s }
-
-#     let(:work_modulo) { 1.0.seconds }
-#     let(:work_offset) { 0.0.seconds }
-
-#     let(:min_work_interval)   { 0.1.seconds }
-#     let(:min_boss_interval)   { 0.1.seconds }
-#     let(:min_end_interval)    { 0.1.seconds }
-#     let(:min_update_interval) { 0.05.seconds }
-
-#     let(:work_block) { lambda{|instance_count:, instance_modulo:, am_boss:| } }
-#     let(:boss_block) { lambda{|instance_count:, instance_modulo:, protocol:| } }
-#     let(:end_block)  { lambda{ } }
-
-#     let(:protocol) {
-#       Protocol.new(
-#         group_uuid:          group_uuid,
-#         work_modulo:         work_modulo,
-#         work_offset:         work_offset,
-#         min_work_interval:   min_work_interval,
-#         min_boss_interval:   min_boss_interval,
-#         min_end_interval:    min_end_interval,
-#         min_update_interval: min_update_interval,
-#         work_block:          work_block,
-#         boss_block:          boss_block,
-#         end_block:           end_block,
-#       )
-#     }
-
-#     context 'calling of end_block' do
-#       class EndBlock
-#         attr_accessor :call_count
-#         attr_accessor :target_num_calls
-#         attr_accessor :call_times
-
-#         def initialize
-#           @call_count       = 0
-#           @target_num_calls = 0
-#           @call_times       = []
-#         end
-
-#         def call
-#           self.call_times << Time.now()
-#           self.call_count += 1
-
-#           self.call_count == self.target_num_calls
-#         end
-#       end
-
-#       let(:end_block) {
-#         dbl = EndBlock.new
-#         allow(dbl).to receive(:call).and_call_original
-#         dbl
-#       }
-
-#       let(:min_work_interval)   { 1.seconds }
-#       let(:min_boss_interval)   { 1.seconds }
-#       let(:min_end_interval)    { 0.1.seconds }
-#       let(:min_update_interval) { 1.seconds }
-
-#       it 'should run until end_block returns true' do
-#         end_block.target_num_calls = 3
-#         Timeout.timeout(1.seconds) {
-#           protocol.run
-#         }
-#         expect(end_block).to have_received(:call).exactly(3).times
-#       end
-
-#       it 'should call end_block about once per min_end_interval' do
-#         end_block.target_num_calls = 10
-#         Timeout.timeout(2.seconds) {
-#           protocol.run
-#         }
-#         deltas = end_block.call_times.each_cons(2).map{ |t1, t2| t2 - t1 }
-#         delta_mean = deltas.sum/deltas.size
-#         delta_std  = Math.sqrt(deltas.inject(0){ |result, val|
-#           result += (val - delta_mean)**2
-#           result
-#         }/(deltas.size-1))
-
-#         expect(end_block.call_count).to equal(10)
-#         expect(delta_mean).to be_within(0.01).of(0.1)
-#         expect(delta_std).to be <= 0.01
-#       end
-#     end
-#   end
-# end

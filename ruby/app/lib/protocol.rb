@@ -1,8 +1,16 @@
 class Protocol
-  def initialize(min_end_interval:,
-                 end_block:)
-    @min_end_interval = min_end_interval
-    @end_block        = end_block
+  def initialize(min_end_interval: 1e10.seconds,
+                 end_block: lambda {},
+                 min_boss_interval: 1e10.seconds,
+                 boss_block: lambda {},
+                 min_work_interval: 1e10.seconds,
+                 work_block: lambda {})
+    @min_end_interval  = min_end_interval
+    @end_block         = end_block
+    @min_boss_interval = min_boss_interval
+    @boss_block        = boss_block
+    @min_work_interval = min_work_interval
+    @work_block        = work_block
   end
 
   def run
@@ -13,8 +21,41 @@ class Protocol
 
     ActiveRecord::Base.clear_active_connections!
 
-    while not @end_block.call
-      sleep @min_end_interval
+    ##
+    ##
+    ##
+
+    current_time = Time.now
+    next_end_block_time  = current_time + @min_end_interval
+    next_boss_block_time = current_time + @min_boss_interval
+    next_work_block_time = current_time + @min_work_interval
+
+    loop do
+      current_loop_time = Time.now
+
+      if current_loop_time >= next_end_block_time
+        next_end_block_time = current_loop_time + @min_end_interval
+        break if @end_block.call
+      end
+
+      if current_loop_time >= next_boss_block_time
+        @boss_block.call
+        next_boss_block_time = current_loop_time + @min_boss_interval
+      end
+
+      if current_loop_time >= next_work_block_time
+        @work_block.call
+        next_work_block_time = current_loop_time + @min_work_interval
+      end
+
+      current_time = Time.now
+      sleep [ 0,
+        [
+          next_end_block_time  - current_time,
+          next_boss_block_time - current_time,
+          next_work_block_time - current_time,
+        ].min
+      ].max
     end
   end
 end
