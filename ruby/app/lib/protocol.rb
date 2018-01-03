@@ -13,6 +13,18 @@ class Protocol
     @work_block        = work_block
   end
 
+  def self.read_records(group_uuid:, instance_uuid:, dead_record_timeout:)
+    group_records = ActiveRecord::Base.connection_pool.with_connection do
+      ProtocolRecord.where(group_uuid: group_uuid).to_a
+    end
+
+    live_records    = group_records.select{|rec| rec.updated_at > Time.now - dead_record_timeout}
+    dead_records    = group_records - live_records
+    instance_record = group_records.detect{|rec| rec.instance_uuid == instance_uuid}
+
+    [instance_record, live_records, dead_records]
+  end
+
   def run
     ##
     ## This is needed to ensure multi-thread applications (like some specs)
