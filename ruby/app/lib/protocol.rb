@@ -13,16 +13,53 @@ class Protocol
     @work_block        = work_block
   end
 
-  def self.read_records(group_uuid:, instance_uuid:, dead_record_timeout:)
+  def self.read_group_records(group_uuid:)
     group_records = ActiveRecord::Base.connection_pool.with_connection do
       ProtocolRecord.where(group_uuid: group_uuid).to_a
     end
+    group_records
+  end
 
+  def self.categorize_records(instance_uuid:, dead_record_timeout:, group_records:)
+    instance_record = group_records.detect{|rec| rec.instance_uuid == instance_uuid}
     live_records    = group_records.select{|rec| rec.updated_at > Time.now - dead_record_timeout}
     dead_records    = group_records - live_records
-    instance_record = group_records.detect{|rec| rec.instance_uuid == instance_uuid}
 
     [instance_record, live_records, dead_records]
+  end
+
+  def self.get_boss_situation(instance_uuid:, live_records:)
+    ## Quickly deal with the no-record case.
+    return [false, nil] if live_records.empty?
+
+    ##
+    ## Group the live records by their vote for boss_uuid.
+    ##
+
+    uuid, votes = live_records.group_by(&:boss_uuid)
+                              .inject([]){|result, (uuid, records)|
+                                 result << [uuid, records.count]
+                                 result
+                              }.sort_by{|uuid, count| count}
+                              .last
+
+    ##
+    ## In order for a boss to be elected:
+    ##   - the boss must have a strict majority of votes (no ties allowed!)
+    ##   - the boss must be in the live record set (no dead bosses allowed!)
+    ##
+
+    boss_uuid   = (votes > live_records.count/2.0) ? uuid : nil
+    boss_record = live_records.detect{|rec| rec.instance_uuid == boss_uuid}
+    boss_uuid   = nil unless boss_record
+
+    ##
+    ## Determine if the target instance is the boss.
+    ##
+
+    am_boss = (boss_uuid == instance_uuid)
+
+    [am_boss, boss_record]
   end
 
   def run
