@@ -96,6 +96,13 @@ class Protocol
     record
   end
 
+  def self.save_record(record:)
+    ActiveRecord::Base.connection_pool.with_connection do
+      record.touch
+      record.save!
+    end
+  end
+
   def run
     ##
     ## This is needed to ensure multi-thread applications (like some specs)
