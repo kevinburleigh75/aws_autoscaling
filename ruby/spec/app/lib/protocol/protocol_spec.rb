@@ -23,6 +23,51 @@ end
 
 RSpec.describe 'protocol' do
 
+  context '#read_records' do
+    let(:target_group_uuid) { SecureRandom.uuid.to_s }
+    let(:action) { Protocol::read_records(group_uuid: target_group_uuid) }
+
+    context 'when no target ProtocolRecords are present' do
+
+      let!(:non_target_protocol_records) {
+        3.times.map{ create(:protocol_record) }
+      }
+
+      context 'my_record is nil' do
+        it 'should pass' do
+          my_record, group_records, dead_records = action
+          expect(my_record).to be_nil
+        end
+      end
+      context 'group_records is empty' do
+        it 'should pass' do
+          my_record, group_records, dead_records = action
+          expect(group_records).to be_empty
+        end
+      end
+      context 'dead_records is empty' do
+        it 'should pass' do
+          my_record, group_records, dead_records = action
+          expect(dead_records).to be_empty
+        end
+      end
+    end
+
+
+  end
+
+  # context 'factory bot exper' do
+  #   before(:each) do
+  #     create(:protocol_record)
+  #     create(:protocol_record)
+  #     create(:protocol_record)
+  #   end
+
+  #   it 'has the right number of records' do
+  #     expect(ProtocolRecord.count).to equal(3)
+  #   end
+  # end
+
   context '.run' do
     context 'termination' do
       context 'no end_block is given' do
