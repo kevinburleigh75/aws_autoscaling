@@ -103,6 +103,13 @@ class Protocol
     end
   end
 
+  def self.update_boss_uuid(instance_record:, live_records:)
+    lowest_uuid = live_records.map(&:instance_uuid).sort.first
+    instance_record.boss_uuid      = lowest_uuid
+    instance_record.instance_count = live_records.count
+    self.save_record(record: instance_record)
+  end
+
   def run
     ##
     ## This is needed to ensure multi-thread applications (like some specs)

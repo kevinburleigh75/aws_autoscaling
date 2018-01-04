@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#create_record' do
+RSpec.describe 'Protocol#save_record' do
   let!(:target_record) { create(:protocol_record, instance_modulo: 1) }
   let!(:updated_after_time) { sleep 0.1; Time.now.utc }
 
