@@ -62,6 +62,40 @@ class Protocol
     [am_boss, boss_record]
   end
 
+  def self.create_record(group_uuid:, instance_uuid:)
+    ##
+    ## There is some extra looping to protect against
+    ## the possibility of accidentally violating the
+    ## uniqueness constraint on [:group_uuid, :instance_modulo],
+    ## which should only happen very, very rarely.
+    ##
+
+    record = loop do
+      retries ||= 0
+
+      begin
+        modulo = -1000 - rand(1_000)
+
+        record = ActiveRecord::Base.connection_pool.with_connection do
+          ProtocolRecord.create!(
+            group_uuid:          group_uuid,
+            instance_uuid:       instance_uuid,
+            instance_count:      1,
+            instance_modulo:     modulo,
+            boss_uuid:           instance_uuid,
+          )
+        end
+
+        break record
+      rescue ActiveRecord::WrappedDatabaseException
+        retry if (retries += 1) < 20
+        raise "failed after #{retries} retries"
+      end
+    end
+
+    record
+  end
+
   def run
     ##
     ## This is needed to ensure multi-thread applications (like some specs)
