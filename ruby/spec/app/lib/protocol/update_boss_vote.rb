@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#update_boss_uuid' do
+RSpec.describe 'Protocol#update_boss_vote' do
   let(:target_group_uuid)    { SecureRandom.uuid.to_s }
   let(:target_instance_uuid) { '33521a44-c825-4e9f-bf55-a1bcde2db82c'}
 
@@ -28,7 +28,7 @@ RSpec.describe 'Protocol#update_boss_uuid' do
   let!(:updated_after_time) { sleep 0.01; Time.now.utc }
 
   let!(:action) {
-    Protocol.update_boss_uuid(
+    Protocol.update_boss_vote(
       instance_record: target_instance_record,
       live_records: live_records
     )
