@@ -110,6 +110,51 @@ class Protocol
     self.save_record(record: instance_record)
   end
 
+  def self.allocate_modulo(instance_record:, live_records:, boss_record:)
+    actual_modulos = live_records.map(&:instance_modulo).sort
+    target_modulos = (0..boss_record.instance_count-1).to_a
+    if actual_modulos != target_modulos
+      if (instance_record.instance_modulo < 0) || (instance_record.instance_modulo >= boss_record.instance_count)
+        boss_instance_count = boss_record.instance_count
+
+        all_modulos = (0..boss_instance_count-1).to_a
+        taken_modulos = live_records.select{ |rec|
+          (rec.instance_modulo >= 0) && (rec.instance_modulo < boss_instance_count)
+        }.map(&:instance_modulo).sort
+
+        available_modulos = all_modulos - taken_modulos
+
+        available_modulos.each do |target_modulo|
+          begin
+            instance_record.instance_modulo = target_modulo
+            instance_record.instance_count  = live_records.count
+            save_record(record: instance_record)
+            break
+          rescue ActiveRecord::WrappedDatabaseException
+            ##
+            ## It's possible that another instance took the target modulo
+            ## before this instance could get it, so just swallow this
+            ## exception.
+            ##
+          end
+        end
+
+        ##
+        ## Whether or not we were able to allocate a modulo,
+        ## return true to indicate that some action was taken.
+        ##
+
+        return true
+      end
+    end
+
+    ##
+    ## No action was taken, so return false.
+    ##
+
+    return false
+  end
+
   def run
     ##
     ## This is needed to ensure multi-thread applications (like some specs)
