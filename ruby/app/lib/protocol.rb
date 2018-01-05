@@ -23,15 +23,8 @@ class Protocol
     modulo_time        = reference_time - (reference_time.to_f % timing_modulo)
     interval_base_time = modulo_time + timing_offset + (instance_modulo.to_f/instance_count)*interval
     next_time          = interval_base_time + (((current_time - interval_base_time)/interval).floor + 1)*interval
-    # puts "modulo_time: #{modulo_time.iso8601(6)} interval_base_time: #{interval_base_time.iso8601(6)} current_time: #{current_time.iso8601(6)} next_time: #{next_time.iso8601(6)}"
     next_time
   end
-
-    # if last_time.nil?
-    #   last_time = current_time - (current_time.to_f % @work_modulo) + @work_offset + @min_work_interval/instance_count*instance_modulo
-    # end
-
-    # next_time = last_time + @min_work_interval
 
   def self.read_group_records(group_uuid:)
     group_records = ActiveRecord::Base.connection_pool.with_connection do
