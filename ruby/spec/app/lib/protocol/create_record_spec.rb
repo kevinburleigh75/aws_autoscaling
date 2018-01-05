@@ -3,11 +3,13 @@ require 'rails_helper'
 RSpec.describe 'Protocol#create_record' do
   let(:target_group_uuid)          { SecureRandom.uuid.to_s }
   let(:target_instance_uuid)       { SecureRandom.uuid.to_s }
+  let(:target_instance_desc)       { 'the target instance description' }
 
   let(:action) {
     Protocol.create_record(
       group_uuid:    target_group_uuid,
       instance_uuid: target_instance_uuid,
+      instance_desc: target_instance_desc,
     )
   }
 
@@ -37,6 +39,12 @@ RSpec.describe 'Protocol#create_record' do
     context 'with the given instance_uuid' do
       it 'should pass' do
         expect(action.instance_uuid).to eq(target_instance_uuid)
+      end
+    end
+
+    context 'with the given instance_desc' do
+      it 'should pass' do
+        expect(action.instance_desc).to eq(target_instance_desc)
       end
     end
 

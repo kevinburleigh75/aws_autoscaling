@@ -6,8 +6,14 @@ class CreateProtocolRecords < ActiveRecord::Migration[5.1]
       t.uuid     :instance_uuid,        null: false
       t.integer  :instance_count,       null: false
       t.integer  :instance_modulo,      null: false
+      t.string   :instance_desc,        null: false
 
       t.uuid     :boss_uuid,            null: false
+
+      t.timestamp :next_end_time,       null: false
+      t.timestamp :next_boss_time,      null: false
+      t.timestamp :next_work_time,      null: false
+      t.timestamp :next_wake_time,      null: false
 
       t.timestamps                      null: false
     end

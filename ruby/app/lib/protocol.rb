@@ -62,7 +62,7 @@ class Protocol
     [am_boss, boss_record]
   end
 
-  def self.create_record(group_uuid:, instance_uuid:)
+  def self.create_record(group_uuid:, instance_uuid:, instance_desc:)
     ##
     ## There is some extra looping to protect against
     ## the possibility of accidentally violating the
@@ -82,7 +82,12 @@ class Protocol
             instance_uuid:       instance_uuid,
             instance_count:      1,
             instance_modulo:     modulo,
+            instance_desc:       instance_desc,
             boss_uuid:           instance_uuid,
+            next_end_time:       Time.now.utc,
+            next_boss_time:      Time.now.utc,
+            next_work_time:      Time.now.utc,
+            next_wake_time:      Time.now.utc,
           )
         end
 
