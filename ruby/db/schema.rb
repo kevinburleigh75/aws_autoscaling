@@ -94,10 +94,10 @@ ActiveRecord::Schema.define(version: 20171031115929) do
     t.integer "instance_modulo", null: false
     t.string "instance_desc", null: false
     t.uuid "boss_uuid", null: false
-    t.datetime "next_end_time", null: false
-    t.datetime "next_boss_time", null: false
-    t.datetime "next_work_time", null: false
-    t.datetime "next_wake_time", null: false
+    t.datetime "next_end_time"
+    t.datetime "next_boss_time"
+    t.datetime "next_work_time"
+    t.datetime "next_wake_time"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true

@@ -1,16 +1,292 @@
 class Protocol
-  def initialize(min_end_interval: 1e10.seconds,
-                 end_block: lambda {},
-                 min_boss_interval: 1e10.seconds,
-                 boss_block: lambda {},
-                 min_work_interval: 1e10.seconds,
-                 work_block: lambda {})
+  class Core
+    def initialize(world:)
+      @world = world
+    end
+
+    def process(process_time:)
+      @world.read_group_records
+      @world.categorize_records
+
+      unless @world.has_instance_record?
+        @world.create_instance_record
+        return true
+      end
+
+      if not @world.has_boss_record?
+        @world.update_boss_vote
+        return true
+      end
+
+      @world.align_with_boss
+
+      if @world.allocate_modulo
+        return true
+      end
+
+      if @world.am_boss?
+        if not @world.has_next_boss_time?
+          @world.compute_and_set_next_boss_time(current_time: process_time)
+        end
+
+        @world.destroy_dead_records
+
+        if @world.boss_block_should_be_called?(current_time: process_time)
+          @world.call_boss_block
+          @world.compute_and_set_next_boss_time(current_time: process_time)
+        end
+      else
+        @world.clear_next_boss_time
+      end
+
+      if @world.end_block_should_be_called?(current_time: process_time)
+        return false if @world.call_end_block
+        @world.compute_and_set_next_end_time(current_time: process_time)
+      end
+
+      if @world.work_block_should_be_called?(current_time: process_time)
+        @world.call_work_block
+        @world.compute_and_set_next_work_time(current_time: process_time)
+      end
+
+      @world.save_record
+      @world.sleep_until_next_time
+
+      return true
+    end
+  end
+
+
+  def initialize(min_end_interval:  nil,
+                 end_block:         nil,
+                 min_boss_interval: nil,
+                 boss_block:        nil,
+                 min_work_interval: nil,
+                 work_block:        nil,
+                 min_wake_interval: nil,
+                 group_uuid:,
+                 instance_uuid:,
+                 instance_desc:,
+                 dead_record_timeout:,
+                 reference_time:,
+                 timing_modulo:,
+                 timing_offset:)
     @min_end_interval  = min_end_interval
     @end_block         = end_block
     @min_boss_interval = min_boss_interval
     @boss_block        = boss_block
     @min_work_interval = min_work_interval
     @work_block        = work_block
+    @min_wake_interval = min_wake_interval || 0.25.seconds
+
+    @group_uuid          = group_uuid
+    @instance_uuid       = instance_uuid
+    @instance_desc       = instance_desc
+    @dead_record_timeout = dead_record_timeout
+    @reference_time      = reference_time
+    @timing_modulo       = timing_modulo
+    @timing_offset       = timing_offset
+
+    @core = Core.new(world: self)
+  end
+
+  def read_group_records
+    @group_records = Protocol.read_group_records(group_uuid: @group_uuid)
+  end
+
+  def categorize_records
+    @instance_record, @live_records, @dead_records = Protocol.categorize_records(
+      instance_uuid:       @instance_uuid,
+      dead_record_timeout: @dead_record_timeout,
+      group_records:       @group_records,
+    )
+  end
+
+  def has_instance_record?
+    !!@instance_record
+  end
+
+  def create_instance_record
+    Protocol.create_record(
+      group_uuid:    @group_uuid,
+      instance_uuid: @instance_uuid,
+      instance_desc: @instance_desc,
+    )
+  end
+
+  def has_boss_record?
+    @am_boss, @boss_record = Protocol.get_boss_situation(
+      instance_uuid: @instance_uuid,
+      live_records:  @live_records,
+    )
+    !!@boss_record
+  end
+
+  def align_with_boss
+    @instance_record.boss_uuid = @boss_record.instance_uuid
+  end
+
+  def update_boss_vote
+    Protocol.update_boss_vote(
+      instance_record: @instance_record,
+      live_records:    @live_records,
+    )
+  end
+
+  def allocate_modulo
+    Protocol.allocate_modulo(
+      instance_record: @instance_record,
+      live_records:    @live_records,
+      boss_record:     @boss_record,
+    )
+  end
+
+  def am_boss?
+    !!@am_boss
+  end
+
+  def has_next_boss_time?
+    return true if (@min_boss_interval.nil? || @boss_block.nil?)
+    return !@instance_record.next_boss_time.nil?
+  end
+
+  def clear_next_boss_time
+    @instance_record.next_boss_time = nil
+  end
+
+  def compute_and_set_next_boss_time(current_time:)
+    time_to_use =
+      if @instance_record.next_boss_time.nil?
+        current_time
+      else
+        @instance_record.next_boss_time + 1e-5.seconds
+      end
+
+    @instance_record.next_boss_time = Protocol.compute_next_time(
+      current_time:    time_to_use,
+      reference_time:  @reference_time,
+      timing_modulo:   @timing_modulo,
+      timing_offset:   @timing_offset,
+      instance_count:  @instance_record.instance_count,
+      instance_modulo: @instance_record.instance_modulo,
+      interval:        @min_boss_interval
+    )
+
+    if @instance_record.next_boss_time < current_time
+      @instance_record.next_boss_time = current_time
+    end
+  end
+
+  def compute_and_set_next_work_time(current_time:)
+    time_to_use =
+      if @instance_record.next_work_time.nil?
+        current_time
+      else
+        @instance_record.next_work_time + 1e-5.seconds
+      end
+
+    @instance_record.next_work_time = Protocol.compute_next_time(
+      current_time:    time_to_use,
+      reference_time:  @reference_time,
+      timing_modulo:   @timing_modulo,
+      timing_offset:   @timing_offset,
+      instance_count:  @instance_record.instance_count,
+      instance_modulo: @instance_record.instance_modulo,
+      interval:        @min_work_interval
+    )
+
+    if @instance_record.next_work_time < current_time
+      @instance_record.next_work_time = current_time
+    end
+  end
+
+  def compute_and_set_next_end_time(current_time:)
+    time_to_use =
+      if @instance_record.next_end_time.nil?
+        current_time
+      else
+        @instance_record.next_end_time + 1e-5.seconds
+      end
+
+    @instance_record.next_end_time = Protocol.compute_next_time(
+      current_time:    time_to_use,
+      reference_time:  @reference_time,
+      timing_modulo:   @timing_modulo,
+      timing_offset:   @timing_offset,
+      instance_count:  @instance_record.instance_count,
+      instance_modulo: @instance_record.instance_modulo,
+      interval:        @min_end_interval
+    )
+
+    if @instance_record.next_end_time < current_time
+      @instance_record.next_end_time = current_time
+    end
+  end
+
+  def destroy_dead_records
+    @dead_records.map(&:destroy)
+  end
+
+  def boss_block_should_be_called?(current_time:)
+    return false if @min_boss_interval.nil? || @boss_block.nil? || @instance_record.next_boss_time.nil?
+    return current_time > @instance_record.next_boss_time
+  end
+
+  def call_boss_block
+    @boss_block.call(protocol: self)
+  end
+
+  def work_block_should_be_called?(current_time:)
+    return false if @min_work_interval.nil? || @work_block.nil? || @instance_record.next_work_time.nil?
+    return current_time > @instance_record.next_work_time
+  end
+
+  def call_work_block
+    @work_block.call(protocol: self)
+  end
+
+  def end_block_should_be_called?(current_time:)
+    return false if @min_end_interval.nil? || @end_block.nil? || @instance_record.next_end_time.nil?
+    return current_time > @instance_record.next_end_time
+  end
+
+  def call_end_block
+    @end_block.call(protocol: self)
+  end
+
+  def save_record
+    @instance_record.instance_count = @live_records.count
+    Protocol.save_record(record: @instance_record)
+  end
+
+  def sleep_until_next_time
+    min_event_time = [
+      @instance_record.next_end_time,
+      @instance_record.next_boss_time,
+      @instance_record.next_work_time,
+    ].compact.min
+
+    if min_event_time.nil?
+      sleep(@min_wake_interval)
+    else
+      sleep([[min_event_time-Time.now, 0.001].max, @min_wake_interval].min)
+    end
+  end
+
+  def run
+    puts "starting run"
+    begin
+      loop do
+        break unless @core.process(process_time: Time.now)
+      end
+    rescue Interrupt => ex
+      # puts 'exiting'
+    rescue Exception => ex
+      raise ex
+    ensure
+      destroy_record
+    end
+    puts "ending run"
   end
 
   def self.compute_next_time(current_time:,
@@ -121,6 +397,13 @@ class Protocol
     end
   end
 
+  def destroy_record
+    instance_record = ActiveRecord::Base.connection_pool.with_connection do
+      ProtocolRecord.where(instance_uuid: @instance_uuid).take
+    end
+    instance_record.destroy! if instance_record
+  end
+
   def self.update_boss_vote(instance_record:, live_records:)
     lowest_uuid = live_records.map(&:instance_uuid).sort.first
     instance_record.boss_uuid      = lowest_uuid
@@ -133,6 +416,7 @@ class Protocol
     target_modulos = (0..boss_record.instance_count-1).to_a
     if actual_modulos != target_modulos
       if (instance_record.instance_modulo < 0) || (instance_record.instance_modulo >= boss_record.instance_count)
+        puts "I need a new modulo"
         boss_instance_count = boss_record.instance_count
 
         all_modulos = (0..boss_instance_count-1).to_a
@@ -173,51 +457,51 @@ class Protocol
     return false
   end
 
-  def run
-    ##
-    ## This is needed to ensure multi-thread applications (like some specs)
-    ## work as intended.
-    ##
+  # def run
+  #   ##
+  #   ## This is needed to ensure multi-thread applications (like some specs)
+  #   ## work as intended.
+  #   ##
 
-    ActiveRecord::Base.clear_active_connections!
+  #   ActiveRecord::Base.clear_active_connections!
 
-    ##
-    ##
-    ##
+  #   ##
+  #   ##
+  #   ##
 
-    current_time = Time.now
-    next_end_block_time  = current_time + @min_end_interval
-    next_boss_block_time = current_time + @min_boss_interval
-    next_work_block_time = current_time + @min_work_interval
+  #   current_time = Time.now
+  #   next_end_block_time  = current_time + @min_end_interval
+  #   next_boss_block_time = current_time + @min_boss_interval
+  #   next_work_block_time = current_time + @min_work_interval
 
-    loop do
-      current_loop_time = Time.now
+  #   loop do
+  #     current_loop_time = Time.now
 
-      if current_loop_time >= next_end_block_time
-        next_end_block_time = current_loop_time + @min_end_interval
-        break if @end_block.call
-      end
+  #     if current_loop_time >= next_end_block_time
+  #       next_end_block_time = current_loop_time + @min_end_interval
+  #       break if @end_block.call
+  #     end
 
-      if current_loop_time >= next_boss_block_time
-        @boss_block.call
-        next_boss_block_time = current_loop_time + @min_boss_interval
-      end
+  #     if current_loop_time >= next_boss_block_time
+  #       @boss_block.call
+  #       next_boss_block_time = current_loop_time + @min_boss_interval
+  #     end
 
-      if current_loop_time >= next_work_block_time
-        @work_block.call
-        next_work_block_time = current_loop_time + @min_work_interval
-      end
+  #     if current_loop_time >= next_work_block_time
+  #       @work_block.call
+  #       next_work_block_time = current_loop_time + @min_work_interval
+  #     end
 
-      current_time = Time.now
-      sleep [ 0,
-        [
-          next_end_block_time  - current_time,
-          next_boss_block_time - current_time,
-          next_work_block_time - current_time,
-        ].min
-      ].max
-    end
-  end
+  #     current_time = Time.now
+  #     sleep [ 0,
+  #       [
+  #         next_end_block_time  - current_time,
+  #         next_boss_block_time - current_time,
+  #         next_work_block_time - current_time,
+  #       ].min
+  #     ].max
+  #   end
+  # end
 end
 
 # class Protocol

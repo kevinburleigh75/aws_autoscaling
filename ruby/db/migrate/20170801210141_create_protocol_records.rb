@@ -10,10 +10,10 @@ class CreateProtocolRecords < ActiveRecord::Migration[5.1]
 
       t.uuid     :boss_uuid,            null: false
 
-      t.timestamp :next_end_time,       null: false
-      t.timestamp :next_boss_time,      null: false
-      t.timestamp :next_work_time,      null: false
-      t.timestamp :next_wake_time,      null: false
+      t.timestamp :next_end_time
+      t.timestamp :next_boss_time
+      t.timestamp :next_work_time
+      t.timestamp :next_wake_time
 
       t.timestamps                      null: false
     end
