@@ -1,11 +1,11 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#get_boss_situation' do
+RSpec.describe 'Protocol::Helpers.get_boss_situation' do
   let(:target_group_uuid)          { SecureRandom.uuid.to_s }
   let(:target_instance_uuid)       { SecureRandom.uuid.to_s }
 
   let(:action) {
-    Protocol.get_boss_situation(
+    Protocol::Helpers.get_boss_situation(
       instance_uuid: target_instance_uuid,
       live_records:  live_records
     )

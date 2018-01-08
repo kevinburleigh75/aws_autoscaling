@@ -1,8 +1,8 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#compute_next_time' do
+RSpec.describe 'Protocol::Helpers.compute_next_time' do
   let(:action) {
-    Protocol.compute_next_time(
+    Protocol::Helpers.compute_next_time(
       current_time:    given_current_time,
       reference_time:  given_reference_time,
       timing_modulo:   given_timing_modulo,

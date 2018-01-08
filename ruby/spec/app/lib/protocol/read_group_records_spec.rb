@@ -1,10 +1,10 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#read_group_records' do
+RSpec.describe 'Protocol::Helpers.read_group_records' do
   let(:target_group_uuid) { SecureRandom.uuid.to_s }
 
   let(:action) {
-    Protocol::read_group_records(group_uuid: target_group_uuid)
+    Protocol::Helpers.read_group_records(group_uuid: target_group_uuid)
   }
 
   context 'when no ProtocolRecords are present' do

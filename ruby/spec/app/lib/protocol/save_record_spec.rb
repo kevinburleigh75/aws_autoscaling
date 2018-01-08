@@ -1,13 +1,13 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#save_record' do
+RSpec.describe 'Protocol::Helpers.save_record' do
   let!(:target_record) { create(:protocol_record, instance_modulo: 1) }
   let!(:updated_after_time) { sleep 0.1; Time.now.utc }
 
   context 'when the record has been updated' do
     let!(:action) {
       target_record.instance_modulo = 4
-      Protocol.save_record(record: target_record)
+      Protocol::Helpers.save_record(record: target_record)
     }
 
     context 'the record is saved and updated_at is changed' do
@@ -23,7 +23,7 @@ RSpec.describe 'Protocol#save_record' do
 
   context 'when the record has not been updated' do
     let!(:action) {
-      Protocol.save_record(record: target_record)
+      Protocol::Helpers.save_record(record: target_record)
     }
 
     context 'updated_at is updated anyways' do

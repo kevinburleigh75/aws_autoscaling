@@ -1,12 +1,12 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#create_record' do
+RSpec.describe 'Protocol::Helpers.create_record' do
   let(:target_group_uuid)          { SecureRandom.uuid.to_s }
   let(:target_instance_uuid)       { SecureRandom.uuid.to_s }
   let(:target_instance_desc)       { 'the target instance description' }
 
   let(:action) {
-    Protocol.create_record(
+    Protocol::Helpers.create_record(
       group_uuid:    target_group_uuid,
       instance_uuid: target_instance_uuid,
       instance_desc: target_instance_desc,

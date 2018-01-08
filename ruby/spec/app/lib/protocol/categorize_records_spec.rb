@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#categorize_records' do
+RSpec.describe 'Protocol::Helpers.categorize_records' do
   let(:target_group_uuid)          { SecureRandom.uuid.to_s }
   let(:target_instance_uuid)       { SecureRandom.uuid.to_s }
 
@@ -9,7 +9,7 @@ RSpec.describe 'Protocol#categorize_records' do
   let(:dead_record_updated_at)     { Time.now - dead_record_timeout - 0.1.seconds }
 
   let(:action) {
-    Protocol::categorize_records(
+    Protocol::Helpers.categorize_records(
       instance_uuid:       target_instance_uuid,
       dead_record_timeout: dead_record_timeout,
       group_records:       group_records,

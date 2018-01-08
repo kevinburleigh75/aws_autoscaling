@@ -1,6 +1,6 @@
 require 'rails_helper'
 
-RSpec.describe 'Protocol#allocate_modulo' do
+RSpec.describe 'Protocol::Helpers.allocate_modulo' do
   context 'when all modulos are already properly assigned' do
     context 'does nothing and returns falsy' do
       let(:target_group_uuid)    { SecureRandom.uuid.to_s }
@@ -27,7 +27,7 @@ RSpec.describe 'Protocol#allocate_modulo' do
       let!(:updated_after_time) { sleep 0.01; Time.now.utc }
 
       let!(:return_value) {
-        Protocol.allocate_modulo(
+        Protocol::Helpers.allocate_modulo(
           instance_record: target_instance_record,
           live_records:    live_records,
           boss_record:     boss_record,
@@ -69,7 +69,7 @@ RSpec.describe 'Protocol#allocate_modulo' do
       let!(:updated_after_time) { sleep 0.01; Time.now.utc }
 
       let!(:return_value) {
-        Protocol.allocate_modulo(
+        Protocol::Helpers.allocate_modulo(
           instance_record: target_instance_record,
           live_records:    live_records,
           boss_record:     boss_record,
@@ -111,7 +111,7 @@ RSpec.describe 'Protocol#allocate_modulo' do
       let!(:updated_after_time) { sleep 0.01; Time.now.utc }
 
       let!(:return_value) {
-        Protocol.allocate_modulo(
+        Protocol::Helpers.allocate_modulo(
           instance_record: target_instance_record,
           live_records:    live_records,
           boss_record:     boss_record,
