@@ -51,6 +51,7 @@ class Protocol
 
       @world.compute_next_wake_time(current_time: process_time)
       @world.save_record
+
       @world.sleep_until_next_event
 
       return true
@@ -285,7 +286,6 @@ class Protocol
   end
 
   def run
-    puts "starting run"
     begin
       loop do
         break unless @core.process(process_time: Time.now)
@@ -297,7 +297,6 @@ class Protocol
     ensure
       destroy_record
     end
-    puts "ending run"
   end
 
   def self.compute_next_time(current_time:,
@@ -403,7 +402,7 @@ class Protocol
 
   def self.save_record(record:)
     ActiveRecord::Base.connection_pool.with_connection do
-      record.touch
+      record.updated_at = Time.now
       record.save!
     end
   end
@@ -427,7 +426,6 @@ class Protocol
     target_modulos = (0..boss_record.instance_count-1).to_a
     if actual_modulos != target_modulos
       if (instance_record.instance_modulo < 0) || (instance_record.instance_modulo >= boss_record.instance_count)
-        puts "I need a new modulo"
         boss_instance_count = boss_record.instance_count
 
         all_modulos = (0..boss_instance_count-1).to_a
@@ -436,12 +434,13 @@ class Protocol
         }.map(&:instance_modulo).sort
 
         available_modulos = all_modulos - taken_modulos
-
+        success = false
         available_modulos.each do |target_modulo|
           begin
             instance_record.instance_modulo = target_modulo
             instance_record.instance_count  = live_records.count
             save_record(record: instance_record)
+            success = true
             break
           rescue ActiveRecord::WrappedDatabaseException
             ##
@@ -451,6 +450,8 @@ class Protocol
             ##
           end
         end
+
+        sleep 0.05.seconds unless success
 
         ##
         ## Whether or not we were able to allocate a modulo,
