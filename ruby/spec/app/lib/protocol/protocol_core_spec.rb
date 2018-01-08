@@ -35,6 +35,7 @@ RSpec.describe 'Protocol::Core#process' do
     allow(dbl).to receive(:has_boss_record?)
               .and_return(has_boss_record_return_value)
     allow(dbl).to receive(:update_boss_vote)
+    allow(dbl).to receive(:align_with_boss)
     allow(dbl).to receive(:am_boss?)
               .and_return(am_boss_return_value)
     allow(dbl).to receive(:has_next_boss_time?)
@@ -55,7 +56,8 @@ RSpec.describe 'Protocol::Core#process' do
               .and_return(work_block_should_be_called_return_value)
     allow(dbl).to receive(:call_work_block)
     allow(dbl).to receive(:compute_and_set_next_work_time)
-    allow(dbl).to receive(:sleep_until_next_time)
+    allow(dbl).to receive(:compute_next_wake_time)
+    allow(dbl).to receive(:sleep_until_next_event)
     allow(dbl).to receive(:save_record)
     dbl
   }
@@ -93,7 +95,8 @@ RSpec.describe 'Protocol::Core#process' do
     :work_block_should_be_called?,
     :call_work_block,
     :compute_and_set_next_work_time,
-    :sleep_until_next_time,
+    :compute_next_wake_time,
+    :sleep_until_next_event,
     :save_record,
   ]
 
@@ -143,7 +146,7 @@ RSpec.describe 'Protocol::Core#process' do
         :has_boss_record?,
         :save_record,
       ]
-      uncalled_methods  = all_methods - called_methods - unchecked_methods
+      uncalled_methods = all_methods - called_methods - unchecked_methods
 
       check_method_calls(called: called_methods, uncalled: uncalled_methods)
     end
@@ -151,7 +154,7 @@ RSpec.describe 'Protocol::Core#process' do
     context 'when there is a boss record' do
       let(:has_boss_record_return_value) { true }
 
-      called_methods    = [:allocate_modulo]
+      called_methods    = [:allocate_modulo, :align_with_boss]
       uncalled_methods  = []
 
       check_method_calls(called: called_methods, uncalled: uncalled_methods)
@@ -258,7 +261,8 @@ RSpec.describe 'Protocol::Core#process' do
             called_methods   = []
             uncalled_methods = [
               :compute_and_set_next_end_time,
-              :sleep_until_next_time,
+              :compute_next_wake_time,
+              :sleep_until_next_event,
               :save_record,
             ]
 
@@ -270,7 +274,8 @@ RSpec.describe 'Protocol::Core#process' do
 
             called_methods = [
               :compute_and_set_next_end_time,
-              :sleep_until_next_time,
+              :compute_next_wake_time,
+              :sleep_until_next_event,
               :save_record,
             ]
             uncalled_methods = []
@@ -310,290 +315,3 @@ RSpec.describe 'Protocol::Core#process' do
     end
   end
 end
-
-  # context 'when there is no elected boss' do
-  #   let(:given_world) {
-  #     dbl = double
-  #     allow(dbl).to receive(:read_group_records)
-  #     allow(dbl).to receive(:categorize_records)
-  #     allow(dbl).to receive(:has_instance_record?).and_return(true)
-  #     allow(dbl).to receive(:has_boss_record?).and_return(false)
-  #     allow(dbl).to receive(:update_boss_vote)
-  #     allow(dbl).to receive(:save_record)
-  #     dbl
-  #   }
-
-  #   it 'calls .read_group_records' do
-  #     action
-  #     expect(given_world).to have_received(:read_group_records).once
-  #   end
-
-  #   it 'calls .categorize_records' do
-  #     action
-  #     expect(given_world).to have_received(:categorize_records).once
-  #   end
-
-  #   it 'calls .has_instance_record?' do
-  #     action
-  #     expect(given_world).to have_received(:has_instance_record?).once
-  #   end
-
-  #   it 'does not call .create_instance_record' do
-  #     action
-  #     ## This is handled by the use of a strict double
-  #     # expect(given_world).to_not have_received(:create_instance_record)
-  #   end
-
-  #   it 'calls .has_boss_record?' do
-  #     action
-  #     expect(given_world).to have_received(:has_boss_record?).once
-  #   end
-
-  #   it 'calls .update_boss_vote' do
-  #     action
-  #     expect(given_world).to have_received(:update_boss_vote).once
-  #   end
-
-  #   it 'calls .save_record' do
-  #     action
-  #     expect(given_world).to have_received(:save_record).once
-  #   end
-
-  #   it 'does not call the end block' do
-  #     action
-  #     ## This is handled by the use of a strict double
-  #     # expect(given_world).to_not have_received(:end_block_should_be_called?)
-  #     # expect(given_world).to_not have_received(:call_end_block)
-  #   end
-
-  #   it 'does not call the boss block' do
-  #     action
-  #     ## This is handled by the use of a strict double
-  #     # expect(given_world).to_not have_received(:boss_block_should_be_called?)
-  #     # expect(given_world).to_not have_received(:call_boss_block)
-  #   end
-
-  #   it 'does not call the work block' do
-  #     action
-  #     ## This is handled by the use of a strict double
-  #     # expect(given_world).to_not have_received(:work_block_should_be_called?)
-  #     # expect(given_world).to_not have_received(:call_work_block)
-  #   end
-
-  #   it 'does not sleep' do
-  #     action
-  #     ## This is handled by the use of a strict double
-  #     # expect(given_world).to_not have_received(:sleep_until_next_time)
-  #   end
-  # end
-
-  # context 'when this instance is the elected boss' do
-  #   context 'and its modulo does not need to be allocated' do
-  #     let(:given_world) {
-  #       dbl = double
-  #       allow(dbl).to receive(:read_group_records)
-  #       allow(dbl).to receive(:categorize_records)
-  #       allow(dbl).to receive(:has_instance_record?).and_return(true)
-  #       allow(dbl).to receive(:has_boss_record?).and_return(true)
-  #       allow(dbl).to receive(:am_boss?).and_return(true)
-  #       allow(dbl).to receive(:has_next_boss_time?).and_return(false)
-  #       allow(dbl).to receive(:compute_and_set_next_boss_time)
-  #       allow(dbl).to receive(:destroy_dead_records)
-  #       allow(dbl).to receive(:allocate_modulo).and_return(false)
-  #       allow(dbl).to receive(:end_block_should_be_called?).and_return(false)
-  #       allow(dbl).to receive(:boss_block_should_be_called?).and_return(false)
-  #       allow(dbl).to receive(:work_block_should_be_called?).and_return(false)
-  #       allow(dbl).to receive(:sleep_until_next_time)
-  #       allow(dbl).to receive(:save_record)
-  #       dbl
-  #     }
-
-  #     it 'calls .read_group_records' do
-  #       action
-  #       expect(given_world).to have_received(:read_group_records).once
-  #     end
-
-  #     it 'calls .categorize_records' do
-  #       action
-  #       expect(given_world).to have_received(:categorize_records).once
-  #     end
-
-  #     it 'calls .has_instance_record?' do
-  #       action
-  #       expect(given_world).to have_received(:has_instance_record?).once
-  #     end
-
-  #     it 'does not call .create_instance_record' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:create_instance_record)
-  #     end
-
-  #     it 'calls .has_boss_record?' do
-  #       action
-  #       expect(given_world).to have_received(:has_boss_record?).once
-  #     end
-
-  #     it 'calls .am_boss?' do
-  #       action
-  #       expect(given_world).to have_received(:am_boss?).once
-  #     end
-
-  #     it 'does not call .update_boss_vote' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:update_boss_vote)
-  #     end
-
-  #     it 'calls .has_next_boss_time?' do
-  #       action
-  #       expect(given_world).to have_received(:has_next_boss_time?).once
-  #     end
-
-  #     it 'calls .compute_and_set_next_boss_time' do
-  #       action
-  #       expect(given_world).to have_received(:compute_and_set_next_boss_time).once
-  #     end
-
-  #     it 'calls .destroy_dead_records' do
-  #       action
-  #       expect(given_world).to have_received(:destroy_dead_records).once
-  #     end
-
-  #     it 'calls .save_record' do
-  #       action
-  #       expect(given_world).to have_received(:save_record).once
-  #     end
-
-  #     it 'does not call the end block' do
-  #       action
-  #       expect(given_world).to have_received(:end_block_should_be_called?)
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:call_end_block)
-  #     end
-
-  #     it 'does not call the boss block' do
-  #       action
-  #       expect(given_world).to have_received(:boss_block_should_be_called?)
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:call_boss_block)
-  #     end
-
-  #     it 'does not call the work block' do
-  #       action
-  #       expect(given_world).to have_received(:work_block_should_be_called?)
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:call_work_block)
-  #     end
-
-  #     it 'sleeps' do
-  #       action
-  #       expect(given_world).to have_received(:sleep_until_next_time).once
-  #     end
-  #   end
-
-  #   context 'and its modulo needs to be allocated' do
-  #     let(:given_world) {
-  #       dbl = double
-  #       allow(dbl).to receive(:read_group_records)
-  #       allow(dbl).to receive(:categorize_records)
-  #       allow(dbl).to receive(:has_instance_record?).and_return(true)
-  #       allow(dbl).to receive(:has_boss_record?).and_return(true)
-  #       allow(dbl).to receive(:am_boss?).and_return(false)
-  #       allow(dbl).to receive(:clear_next_boss_time)
-  #       allow(dbl).to receive(:allocate_modulo).and_return(true)
-  #       allow(dbl).to receive(:save_record)
-  #       dbl
-  #     }
-
-  #     it 'calls .read_group_records' do
-  #       action
-  #       expect(given_world).to have_received(:read_group_records).once
-  #     end
-
-  #     it 'calls .categorize_records' do
-  #       action
-  #       expect(given_world).to have_received(:categorize_records).once
-  #     end
-
-  #     it 'calls .has_instance_record?' do
-  #       action
-  #       expect(given_world).to have_received(:has_instance_record?).once
-  #     end
-
-  #     it 'does not call .create_instance_record' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:create_instance_record)
-  #     end
-
-  #     it 'calls .has_boss_record?' do
-  #       action
-  #       expect(given_world).to have_received(:has_boss_record?).once
-  #     end
-
-  #     it 'calls .am_boss?' do
-  #       action
-  #       expect(given_world).to have_received(:am_boss?).once
-  #     end
-
-  #     it 'calls .clear_next_boss_time' do
-  #       action
-  #       expect(given_world).to have_received(:clear_next_boss_time).once
-  #     end
-
-  #     it 'does not call .update_boss_vote' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to_not have_received(:update_boss_vote)
-  #     end
-
-  #     it 'does not call .has_next_boss_time?' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to have_received(:has_next_boss_time?).once
-  #     end
-
-  #     it 'does not call .compute_and_set_next_boss_time' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to have_received(:compute_and_set_next_boss_time).once
-  #     end
-
-  #     it 'does not call .destroy_dead_records' do
-  #       action
-  #       ## This is handled by the use of a strict double
-  #       # expect(given_world).to have_received(:destroy_dead_records).once
-  #     end
-
-  #     it 'calls .save_record' do
-  #       action
-  #       expect(given_world).to have_received(:save_record).once
-  #     end
-
-  #     it 'does not call the end block' do
-  #       action
-  #       # expect(given_world).to_not have_received(:end_block_should_be_called?)
-  #       # expect(given_world).to_not have_received(:call_end_block)
-  #     end
-
-  #     it 'does not call the boss block' do
-  #       action
-  #       # expect(given_world).to_not have_received(:boss_block_should_be_called?)
-  #       # expect(given_world).to_not have_received(:call_boss_block)
-  #     end
-
-  #     it 'does not call the work block' do
-  #       action
-  #       # expect(given_world).to_not have_received(:work_block_should_be_called?)
-  #       # expect(given_world).to_not have_received(:call_work_block)
-  #     end
-
-  #     it 'does not sleep' do
-  #       action
-  #       # expect(given_world).to_not have_received(:sleep_until_next_time)
-  #     end
-  #   end
-
-#   end
-# end
