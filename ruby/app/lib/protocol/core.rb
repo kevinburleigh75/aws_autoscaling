@@ -20,6 +20,10 @@ class Protocol
 
       @world.align_with_boss
 
+      if @world.am_boss?
+        @world.destroy_dead_records
+      end
+
       if @world.allocate_modulo
         return true
       end
@@ -28,8 +32,6 @@ class Protocol
         if not @world.has_next_boss_time?
           @world.compute_and_set_next_boss_time(current_time: process_time)
         end
-
-        @world.destroy_dead_records
 
         if @world.boss_block_should_be_called?(current_time: process_time)
           @world.call_boss_block

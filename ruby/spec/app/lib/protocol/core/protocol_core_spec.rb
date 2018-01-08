@@ -1,10 +1,21 @@
 require 'rails_helper'
 
 def check_method_calls(called:, uncalled:)
-  called.each do |method_name|
-    it "calls #{method_name}" do
-      action
-      expect(given_world).to have_received(method_name).once
+  called.each do |thing|
+    if thing.is_a?(Array)
+      method_name = thing[0]
+      call_count  = thing[1]
+
+      it "calls #{method_name} #{call_count} times" do
+        action
+        expect(given_world).to have_received(method_name).exactly(call_count).times
+      end
+    else
+      method_name = thing
+      it "calls #{method_name}" do
+        action
+        expect(given_world).to have_received(method_name).once
+      end
     end
   end
 
@@ -154,10 +165,19 @@ RSpec.describe 'Protocol::Core#process' do
     context 'when there is a boss record' do
       let(:has_boss_record_return_value) { true }
 
-      called_methods    = [:allocate_modulo, :align_with_boss]
+      called_methods    = [:allocate_modulo, :align_with_boss, [:am_boss?,2]]
       uncalled_methods  = []
 
       check_method_calls(called: called_methods, uncalled: uncalled_methods)
+
+      context 'when this instance the the boss' do
+        let(:am_boss_return_value) { true }
+
+        called_methods    = [:destroy_dead_records]
+        uncalled_methods  = []
+
+        check_method_calls(called: called_methods, uncalled: uncalled_methods)
+      end
 
       context 'when the instance modulo needs to be allocated' do
         let(:allocate_modulo_return_value) { true }
@@ -168,6 +188,8 @@ RSpec.describe 'Protocol::Core#process' do
           :categorize_records,
           :has_instance_record?,
           :has_boss_record?,
+          :am_boss?,
+          :destroy_dead_records,
           :allocate_modulo,
         ]
         uncalled_methods  = all_methods - called_methods - unchecked_methods
@@ -178,7 +200,7 @@ RSpec.describe 'Protocol::Core#process' do
       context 'when the instance modulo does not need to be allocated' do
         let(:allocate_modulo_return_value) { false }
 
-        called_methods    = [:am_boss?]
+        called_methods    = [[:am_boss?,2]]
         uncalled_methods  = []
 
         check_method_calls(called: called_methods, uncalled: uncalled_methods)
@@ -188,7 +210,6 @@ RSpec.describe 'Protocol::Core#process' do
 
           called_methods    = [
             :has_next_boss_time?,
-            :destroy_dead_records,
             :boss_block_should_be_called?,
           ]
           uncalled_methods  = [:clear_next_boss_time]

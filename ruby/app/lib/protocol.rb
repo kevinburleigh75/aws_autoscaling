@@ -238,4 +238,11 @@ class Protocol
     delay = [@instance_record.next_wake_time - Time.now, 0.001].max
     sleep(delay)
   end
+
+  def destroy_record
+    instance_record = ActiveRecord::Base.connection_pool.with_connection do
+      ProtocolRecord.where(instance_uuid: @instance_uuid).take
+    end
+    instance_record.destroy! if instance_record
+  end
 end
