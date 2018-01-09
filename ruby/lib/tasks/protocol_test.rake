@@ -6,18 +6,15 @@ module ProtocolTest
 
     def do_work(protocol:)
       @counter += 1
-      # Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} working away as usual..."
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
     end
 
     def do_boss(protocol:)
-      # Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} doing boss stuff..."
-      # sleep(0.05)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} doing boss stuff..."
     end
 
     def do_end(protocol:)
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} running end block..."
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} running end block..."
       false
     end
   end

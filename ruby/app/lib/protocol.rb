@@ -46,6 +46,26 @@ class Protocol
     end
   end
 
+  def group_uuid
+    @group_uuid
+  end
+
+  def instance_uuid
+    @instance_uuid
+  end
+
+  def am_boss?
+    !!@am_boss
+  end
+
+  def count
+    @instance_record.instance_count
+  end
+
+  def modulo
+    @instance_record.instance_modulo
+  end
+
   def read_group_records
     @group_records = Protocol::Helpers.read_group_records(group_uuid: @group_uuid)
   end
