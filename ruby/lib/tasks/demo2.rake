@@ -122,7 +122,7 @@ module Demo2
 
       launch_time_sec                = Rails.env.production? ? 120 : 10
       min_autoscale_request_interval = launch_time_sec
-      max_num_workers                = Integer(ENV['AWS_ASG_MAX_SIZE']) || 10
+      max_num_workers                = Integer(ENV['AWS_ASG_MAX_SIZE'] || 10)
       epsilon                        = 1e-6
       rate_average_time              = Rails.env.production? ? 300 : 30
 

@@ -1,0 +1,746 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Metadata": {
+        "AWS::CloudFormation::Designer": {
+            "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 670,
+                    "y": 110
+                },
+                "z": 0,
+                "embeds": []
+            },
+            "6f7ea462-5a95-448f-a9d4-34feb9483e65": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 470,
+                    "y": 40
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4",
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
+                ]
+            },
+            "1da9b131-7370-48c0-94cc-3e020c2ded4f": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": -110,
+                    "y": 50
+                },
+                "z": 0,
+                "embeds": []
+            },
+            "d5ebcac0-c964-4a18-9809-d050b006bf86": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 10,
+                    "y": 50
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
+                ],
+                "isrelatedto": [
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
+                ]
+            },
+            "38ad2c82-ac87-4043-b496-d1ca32e81c8e": {
+                "source": {
+                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
+                },
+                "target": {
+                    "id": "1da9b131-7370-48c0-94cc-3e020c2ded4f"
+                },
+                "z": 11
+            },
+            "fa8c2d21-6092-492a-b15f-4eca448b61d5": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 130,
+                    "y": 50
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "d5ebcac0-c964-4a18-9809-d050b006bf86"
+                ],
+                "isrelatedto": [
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
+                ]
+            },
+            "265a2981-3c0e-4087-b0a0-46ace31f12eb": {
+                "source": {
+                    "id": "fa8c2d21-6092-492a-b15f-4eca448b61d5"
+                },
+                "target": {
+                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
+                },
+                "z": 12
+            },
+            "0b0f7f27-642a-4abc-bda0-27e25ae6371a": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 240,
+                    "y": 40
+                },
+                "z": 0,
+                "embeds": []
+            },
+            "5bd1732a-55c6-43e0-b3a3-2324f0b029a8": {
+                "source": {
+                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                },
+                "target": {
+                    "id": "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
+                },
+                "z": 11
+            },
+            "f1fa2249-c23c-4346-b255-96613a553d22": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 130,
+                    "y": 180
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "d5ebcac0-c964-4a18-9809-d050b006bf86"
+                ],
+                "isrelatedto": [
+                    "95a11158-749f-4146-9919-fc5eae51bf05"
+                ]
+            },
+            "95a11158-749f-4146-9919-fc5eae51bf05": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 240,
+                    "y": 180
+                },
+                "z": 0,
+                "embeds": []
+            },
+            "6c1ef4a8-64e2-4358-9234-34806834610c": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 470,
+                    "y": 180
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4",
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
+                    "95a11158-749f-4146-9919-fc5eae51bf05"
+                ]
+            },
+            "62879a53-390a-48e1-88bc-9abdf06452c8": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 580,
+                    "y": -70
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                ]
+            },
+            "971ecb14-6861-4ff6-8e49-f476f3ec3a03": {
+                "source": {
+                    "id": "62879a53-390a-48e1-88bc-9abdf06452c8"
+                },
+                "target": {
+                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                },
+                "z": 11
+            },
+            "6aa655c5-56bb-429c-b651-97a742ed0567": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 710,
+                    "y": -70
+                },
+                "z": 0,
+                "embeds": [],
+                "isassociatedwith": [
+                    "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                ]
+            },
+            "8b602b7b-d05c-459a-a946-a871c9d29206": {
+                "source": {
+                    "id": "6aa655c5-56bb-429c-b651-97a742ed0567"
+                },
+                "target": {
+                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                },
+                "z": 11
+            },
+            "3cc50e63-3ae8-406b-8aba-789b13545886": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 580,
+                    "y": -190
+                },
+                "z": 0,
+                "embeds": [],
+                "isrelatedto": [
+                    "62879a53-390a-48e1-88bc-9abdf06452c8",
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
+                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
+                ]
+            },
+            "3c557255-ff40-4cb5-8552-898ce7ac2f0e": {
+                "size": {
+                    "width": 60,
+                    "height": 60
+                },
+                "position": {
+                    "x": 710,
+                    "y": -190
+                },
+                "z": 0,
+                "embeds": [],
+                "isrelatedto": [
+                    "6aa655c5-56bb-429c-b651-97a742ed0567",
+                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
+                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
+                ]
+            }
+        }
+    },
+    "Resources": {
+        "LcElbExper": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": "ami-37884c4d",
+                "InstanceType": "t2.micro",
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "/usr/local/bin/cfn-init -v ",
+                                "   --stack ",
+                                {
+                                    "Ref": "AWS::StackName"
+                                },
+                                "   --resource LcElbExper\n",
+                                "systemctl enable kevin_external_server\n",
+                                "systemctl restart kevin_external_server\n"
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4"
+                },
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "default": [
+                            "cloneAndCheckout",
+                            "initialize"
+                        ]
+                    },
+                    "cloneAndCheckout": {
+                        "commands": {
+                            "01_clone": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not cloning repo because this is the production environment",
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "sudo -H -i -u ubuntu bash -c \"git clone ",
+                                                    {
+                                                        "Ref": "RepoUrl"
+                                                    },
+                                                    " ./primary_repo\" "
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                }
+                            },
+                            "02_checkout": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not checking anything out because this is the production environment",
+                                        {
+                                            "Fn::Join": [
+                                                "",
+                                                [
+                                                    "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ",
+                                                    {
+                                                        "Ref": "BranchNameOrSha"
+                                                    },
+                                                    "\" "
+                                                ]
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "initialize": {
+                        "commands": {
+                            "01_initialize": {
+                                "command": "/bin/bash initialize.sh",
+                                "cwd": "/home/ubuntu/primary_repo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Elb": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "Subnets": [
+                    "subnet-206ebe56",
+                    "subnet-fc93e699",
+                    "subnet-fdab4cd7"
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "1da9b131-7370-48c0-94cc-3e020c2ded4f"
+                }
+            }
+        },
+        "ElbListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "LoadBalancerArn": {
+                    "Ref": "Elb"
+                },
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup1"
+                        }
+                    }
+                ],
+                "Port": "3000",
+                "Protocol": "HTTP"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
+                }
+            }
+        },
+        "ElbRule1": {
+            "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+            "Properties": {
+                "ListenerArn": {
+                    "Ref": "ElbListener"
+                },
+                "Actions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup1"
+                        }
+                    }
+                ],
+                "Conditions": [
+                    {
+                        "Field": "path-pattern",
+                        "Values": [
+                            "/task1"
+                        ]
+                    }
+                ],
+                "Priority": 1
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "fa8c2d21-6092-492a-b15f-4eca448b61d5"
+                }
+            }
+        },
+        "Asg1": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": {
+                    "Ref": "LcElbExper"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "asg-external-1",
+                        "PropagateAtLaunch": "true"
+                    }
+                ],
+                "AvailabilityZones": [
+                    "us-east-1a",
+                    "us-east-1b",
+                    "us-east-1c"
+                ],
+                "DesiredCapacity": 1,
+                "MinSize": 1,
+                "MaxSize": 10,
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "ElbGroup1"
+                    }
+                ],
+                "HealthCheckGracePeriod": 60,
+                "HealthCheckType": "ELB"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                }
+            }
+        },
+        "ElbGroup1": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "TargetGroupAttributes": [
+                    {
+                        "Key": "deregistration_delay.timeout_seconds",
+                        "Value": "20"
+                    }
+                ],
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckPath": "/ping",
+                "HealthCheckPort": 3000,
+                "HealthCheckIntervalSeconds": 10,
+                "HealthCheckTimeoutSeconds": 5,
+                "HealthyThresholdCount": 2,
+                "UnhealthyThresholdCount": 10,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Port": 3000,
+                "Protocol": "HTTP",
+                "VpcId": "vpc-b087e6d4"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
+                }
+            }
+        },
+        "ElbRule2": {
+            "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+            "Properties": {
+                "ListenerArn": {
+                    "Ref": "ElbListener"
+                },
+                "Actions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup2"
+                        }
+                    }
+                ],
+                "Conditions": [
+                    {
+                        "Field": "path-pattern",
+                        "Values": [
+                            "/task2"
+                        ]
+                    }
+                ],
+                "Priority": 2
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "f1fa2249-c23c-4346-b255-96613a553d22"
+                }
+            }
+        },
+        "ElbGroup2": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "TargetGroupAttributes": [
+                    {
+                        "Key": "deregistration_delay.timeout_seconds",
+                        "Value": "120"
+                    }
+                ],
+                "HealthCheckIntervalSeconds": 20,
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckPath": "/ping",
+                "HealthCheckPort": 3000,
+                "HealthCheckTimeoutSeconds": 2,
+                "HealthyThresholdCount": 2,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Port": 3000,
+                "Protocol": "HTTP",
+                "UnhealthyThresholdCount": 10,
+                "VpcId": "vpc-b087e6d4"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "95a11158-749f-4146-9919-fc5eae51bf05"
+                }
+            }
+        },
+        "Asg2": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": {
+                    "Ref": "LcElbExper"
+                },
+                "TargetGroupARNs": [
+                    {
+                        "Ref": "ElbGroup2"
+                    }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "asg-external-2",
+                        "PropagateAtLaunch": "true"
+                    }
+                ],
+                "AvailabilityZones": [
+                    "us-east-1a",
+                    "us-east-1b",
+                    "us-east-1c"
+                ],
+                "DesiredCapacity": 1,
+                "MinSize": 1,
+                "MaxSize": 10
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6c1ef4a8-64e2-4358-9234-34806834610c"
+                }
+            }
+        },
+        "Task1TooFewRequestsPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AutoScalingGroupName": {
+                    "Ref": "Asg1"
+                },
+                "AdjustmentType": "ChangeInCapacity",
+                "PolicyType": "StepScaling",
+                "StepAdjustments": [
+                    {
+                        "MetricIntervalUpperBound": 0,
+                        "MetricIntervalLowerBound": -50,
+                        "ScalingAdjustment": -1
+                    },
+                    {
+                        "MetricIntervalUpperBound": -50,
+                        "MetricIntervalLowerBound": -100,
+                        "ScalingAdjustment": -2
+                    },
+                    {
+                        "MetricIntervalUpperBound": -100,
+                        "ScalingAdjustment": -3
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "62879a53-390a-48e1-88bc-9abdf06452c8"
+                }
+            }
+        },
+        "Task1TooManyRequestsPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AutoScalingGroupName": {
+                    "Ref": "Asg1"
+                },
+                "AdjustmentType": "ChangeInCapacity",
+                "EstimatedInstanceWarmup": 60,
+                "PolicyType": "StepScaling",
+                "StepAdjustments": [
+                    {
+                        "MetricIntervalLowerBound": 0,
+                        "MetricIntervalUpperBound": 200,
+                        "ScalingAdjustment": 1
+                    },
+                    {
+                        "MetricIntervalLowerBound": 200,
+                        "MetricIntervalUpperBound": 500,
+                        "ScalingAdjustment": 2
+                    },
+                    {
+                        "MetricIntervalLowerBound": 500,
+                        "MetricIntervalUpperBound": 800,
+                        "ScalingAdjustment": 3
+                    },
+                    {
+                        "MetricIntervalLowerBound": 800,
+                        "ScalingAdjustment": 10
+                    }
+                ]
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6aa655c5-56bb-429c-b651-97a742ed0567"
+                }
+            }
+        },
+        "Task1TooFewRequestsAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "Task1TooFewRequestsAlarm",
+                "AlarmDescription": "Task1 requests/instance below threshold",
+                "AlarmActions": [
+                    {
+                        "Ref": "Task1TooFewRequestsPolicy"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "TargetGroup",
+                        "Value": {
+                            "Fn::GetAtt": [
+                                "ElbGroup1",
+                                "TargetGroupFullName"
+                            ]
+                        }
+                    }
+                ],
+                "Namespace": "AWS/ApplicationELB",
+                "MetricName": "RequestCountPerTarget",
+                "Statistic": "Sum",
+                "ComparisonOperator": "LessThanOrEqualToThreshold",
+                "Threshold": "150",
+                "Period": "60",
+                "EvaluationPeriods": "3",
+                "TreatMissingData": "missing"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "3cc50e63-3ae8-406b-8aba-789b13545886"
+                }
+            }
+        },
+        "Task1TooManyRequestsAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": "Task1TooManyRequestsAlarm",
+                "AlarmDescription": "Task1 requests/instance above threshold",
+                "AlarmActions": [
+                    {
+                        "Ref": "Task1TooManyRequestsPolicy"
+                    }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "TargetGroup",
+                        "Value": {
+                            "Fn::GetAtt": [
+                                "ElbGroup1",
+                                "TargetGroupFullName"
+                            ]
+                        }
+                    }
+                ],
+                "Namespace": "AWS/ApplicationELB",
+                "MetricName": "RequestCountPerTarget",
+                "Statistic": "Sum",
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "Threshold": "400",
+                "Period": "60",
+                "EvaluationPeriods": "1",
+                "TreatMissingData": "missing"
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "3c557255-ff40-4cb5-8552-898ce7ac2f0e"
+                }
+            }
+        }
+    },
+    "Parameters": {
+        "EnvName": {
+            "Description": "Name for this environment",
+            "Type": "String",
+            "ConstraintDescription": "'production' is special because image update will not occur, but otherwise almost anything goes"
+        },
+        "RepoUrl": {
+            "Description": "URL for git clone operation",
+            "Type": "String",
+            "ConstraintDescription": "must be the URL of an existing GitHub repo (applies only to non-production environments)"
+        },
+        "BranchNameOrSha": {
+            "Description": "git branch name (latest) or SHA to be used",
+            "Type": "String",
+            "ConstraintDescription": "must be the name of a valid branch of SHA (applies only to non-production environments)"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        }
+    },
+    "Conditions": {
+        "IsProduction": {
+            "Fn::Equals": [
+                {
+                    "Ref": "EnvName"
+                },
+                "production"
+            ]
+        }
+    }
+}
