@@ -55,19 +55,7 @@
                 "embeds": [],
                 "isassociatedwith": [
                     "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                ],
-                "isrelatedto": [
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
                 ]
-            },
-            "38ad2c82-ac87-4043-b496-d1ca32e81c8e": {
-                "source": {
-                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                },
-                "target": {
-                    "id": "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                },
-                "z": 11
             },
             "fa8c2d21-6092-492a-b15f-4eca448b61d5": {
                 "size": {
@@ -82,19 +70,7 @@
                 "embeds": [],
                 "isassociatedwith": [
                     "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                ],
-                "isrelatedto": [
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
                 ]
-            },
-            "265a2981-3c0e-4087-b0a0-46ace31f12eb": {
-                "source": {
-                    "id": "fa8c2d21-6092-492a-b15f-4eca448b61d5"
-                },
-                "target": {
-                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                },
-                "z": 12
             },
             "0b0f7f27-642a-4abc-bda0-27e25ae6371a": {
                 "size": {
@@ -107,15 +83,6 @@
                 },
                 "z": 0,
                 "embeds": []
-            },
-            "5bd1732a-55c6-43e0-b3a3-2324f0b029a8": {
-                "source": {
-                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                },
-                "target": {
-                    "id": "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
-                },
-                "z": 11
             },
             "f1fa2249-c23c-4346-b255-96613a553d22": {
                 "size": {
@@ -130,9 +97,6 @@
                 "embeds": [],
                 "isassociatedwith": [
                     "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                ],
-                "isrelatedto": [
-                    "95a11158-749f-4146-9919-fc5eae51bf05"
                 ]
             },
             "95a11158-749f-4146-9919-fc5eae51bf05": {
@@ -179,15 +143,6 @@
                     "6f7ea462-5a95-448f-a9d4-34feb9483e65"
                 ]
             },
-            "971ecb14-6861-4ff6-8e49-f476f3ec3a03": {
-                "source": {
-                    "id": "62879a53-390a-48e1-88bc-9abdf06452c8"
-                },
-                "target": {
-                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                },
-                "z": 11
-            },
             "6aa655c5-56bb-429c-b651-97a742ed0567": {
                 "size": {
                     "width": 60,
@@ -203,15 +158,6 @@
                     "6f7ea462-5a95-448f-a9d4-34feb9483e65"
                 ]
             },
-            "8b602b7b-d05c-459a-a946-a871c9d29206": {
-                "source": {
-                    "id": "6aa655c5-56bb-429c-b651-97a742ed0567"
-                },
-                "target": {
-                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                },
-                "z": 11
-            },
             "3cc50e63-3ae8-406b-8aba-789b13545886": {
                 "size": {
                     "width": 60,
@@ -222,12 +168,7 @@
                     "y": -190
                 },
                 "z": 0,
-                "embeds": [],
-                "isrelatedto": [
-                    "62879a53-390a-48e1-88bc-9abdf06452c8",
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
-                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                ]
+                "embeds": []
             },
             "3c557255-ff40-4cb5-8552-898ce7ac2f0e": {
                 "size": {
@@ -239,12 +180,7 @@
                     "y": -190
                 },
                 "z": 0,
-                "embeds": [],
-                "isrelatedto": [
-                    "6aa655c5-56bb-429c-b651-97a742ed0567",
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
-                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                ]
+                "embeds": []
             }
         }
     },
@@ -316,16 +252,7 @@
                                         "IsProduction",
                                         "echo not checking anything out because this is the production environment",
                                         {
-                                            "Fn::Join": [
-                                                "",
-                                                [
-                                                    "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ",
-                                                    {
-                                                        "Ref": "BranchNameOrSha"
-                                                    },
-                                                    "\" "
-                                                ]
-                                            ]
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ${BranchNameOrSha} \" "
                                         }
                                     ]
                                 }
@@ -446,6 +373,17 @@
             "Metadata": {
                 "AWS::CloudFormation::Designer": {
                     "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                }
+            },
+            "UpdatePolicy": {
+                "AutoScalingReplacingUpdate": {
+                    "WillReplace": true
+                }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Count": "3",
+                    "Timeout": "PT15M"
                 }
             }
         },
