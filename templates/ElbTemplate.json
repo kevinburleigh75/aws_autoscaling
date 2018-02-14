@@ -200,14 +200,14 @@
                             "",
                             [
                                 "#!/bin/bash -xe\n",
-                                "/usr/local/bin/cfn-init -v ",
-                                "   --stack ",
                                 {
-                                    "Ref": "AWS::StackName"
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
                                 },
-                                "   --resource LcElbExper\n",
                                 "systemctl enable kevin_external_server\n",
-                                "systemctl restart kevin_external_server\n"
+                                "systemctl restart kevin_external_server\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Asg1 --region ${AWS::Region}\n"
+                                }
                             ]
                         ]
                     }
@@ -232,16 +232,7 @@
                                         "IsProduction",
                                         "echo not cloning repo because this is the production environment",
                                         {
-                                            "Fn::Join": [
-                                                "",
-                                                [
-                                                    "sudo -H -i -u ubuntu bash -c \"git clone ",
-                                                    {
-                                                        "Ref": "RepoUrl"
-                                                    },
-                                                    " ./primary_repo\" "
-                                                ]
-                                            ]
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"git clone ${RepoUrl} ./primary_repo\" "
                                         }
                                     ]
                                 }
@@ -382,8 +373,8 @@
             },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "3",
-                    "Timeout": "PT15M"
+                    "Count": "1",
+                    "Timeout": "PT5M"
                 }
             }
         },
