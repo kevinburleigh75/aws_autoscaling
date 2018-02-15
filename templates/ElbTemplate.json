@@ -188,7 +188,7 @@
         "LcElbExper": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
-                "ImageId": "ami-37884c4d",
+                "ImageId": "ami-05679357ab362f128",
                 "InstanceType": "t2.micro",
                 "SecurityGroups": [
                     "sg-9f7085ec"
