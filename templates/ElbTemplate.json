@@ -188,7 +188,7 @@
         "LcElbExper": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
-                "ImageId": "ami-37884c4d",
+                "ImageId": "ami-05679357ab362f128",
                 "InstanceType": "t2.micro",
                 "SecurityGroups": [
                     "sg-9f7085ec"
@@ -349,7 +349,7 @@
                     "us-east-1b",
                     "us-east-1c"
                 ],
-                "DesiredCapacity": 1,
+                "DesiredCapacity": 3,
                 "MinSize": 1,
                 "MaxSize": 10,
                 "TargetGroupARNs": [
@@ -366,24 +366,13 @@
                 }
             },
             "UpdatePolicy": {
-                "AutoScalingRollingUpdate": {
-                    "MaxBatchSize": 2,
-                    "MinInstancesInService": 6,
-                    "MinSuccessfulInstancesPercent": 50,
-                    "PauseTime": "PT5M",
-                    "WaitOnResourceSignals": true,
-                    "SuspendProcesses": [
-                        "AZRebalance",
-                        "AlarmNotification",
-                        "ScheduledActions",
-                        "HealthCheck",
-                        "ReplaceUnhealthy"
-                    ]
+                "AutoScalingReplacingUpdate" : {
+                  "WillReplace" : true
                 }
             },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "1",
+                    "Count": "3",
                     "Timeout": "PT5M"
                 }
             }
