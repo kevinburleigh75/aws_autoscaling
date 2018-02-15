@@ -366,8 +366,19 @@
                 }
             },
             "UpdatePolicy": {
-                "AutoScalingReplacingUpdate": {
-                    "WillReplace": true
+                "AutoScalingRollingUpdate": {
+                    "MaxBatchSize": 2,
+                    "MinInstancesInService": 6,
+                    "MinSuccessfulInstancesPercent": 50,
+                    "PauseTime": "PT5M",
+                    "WaitOnResourceSignals": true,
+                    "SuspendProcesses": [
+                        "AZRebalance",
+                        "AlarmNotification",
+                        "ScheduledActions",
+                        "HealthCheck",
+                        "ReplaceUnhealthy"
+                    ]
                 }
             },
             "CreationPolicy": {
