@@ -1,7 +1,7 @@
 class TasksController < ApplicationController
   def task1
     sleep(0.05)
-    render plain: 'well that was fun (5)'
+    render plain: 'well that was fun (6)'
   end
 
   def task2
