@@ -203,8 +203,7 @@
                                 {
                                     "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
                                 },
-                                "systemctl enable kevin_external_server\n",
-                                "systemctl restart kevin_external_server\n",
+                                "/bin/bash /home/ubuntu/primary_repo/services/after_cfn_init.sh\n",
                                 {
                                     "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Asg1 --region ${AWS::Region}\n"
                                 }
