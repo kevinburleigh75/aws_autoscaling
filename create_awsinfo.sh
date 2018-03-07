@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 
 PROFILE_FILENAME="$HOME/.profile"
 AWSINFO_FILENAME="$HOME/.awsinfo"

@@ -188,7 +188,9 @@
         "LcElbExper": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
-                "ImageId": "ami-05679357ab362f128",
+                "ImageId": {
+                    "Ref": "LcImageId"
+                },
                 "InstanceType": "t2.micro",
                 "SecurityGroups": [
                     "sg-9f7085ec"
@@ -203,7 +205,7 @@
                                 {
                                     "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
                                 },
-                                "/bin/bash /home/ubuntu/primary_repo/services/after_cfn_init.sh\n",
+                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init.sh\n",
                                 {
                                     "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Asg1 --region ${AWS::Region}\n"
                                 }
@@ -349,7 +351,9 @@
                     "us-east-1b",
                     "us-east-1c"
                 ],
-                "DesiredCapacity": 3,
+                "DesiredCapacity": {
+                    "Ref": "Asg1DesiredCapacity"
+                },
                 "MinSize": 1,
                 "MaxSize": 10,
                 "TargetGroupARNs": [
@@ -357,8 +361,8 @@
                         "Ref": "ElbGroup1"
                     }
                 ],
-                "HealthCheckGracePeriod": 60,
-                "HealthCheckType": "ELB"
+                "HealthCheckType": "ELB",
+                "HealthCheckGracePeriod": 30
             },
             "Metadata": {
                 "AWS::CloudFormation::Designer": {
@@ -367,8 +371,10 @@
             },
             "UpdatePolicy": {
               "AutoScalingRollingUpdate" : {
-                "MaxBatchSize" : 1,
-                "MinInstancesInService" : 3,
+                "MaxBatchSize" : 2,
+                "MinInstancesInService" : {
+                    "Ref": "Asg1DesiredCapacity"
+                },
                 "MinSuccessfulInstancesPercent" : 100,
                 "PauseTime" : "PT5M",
                 "SuspendProcesses" : [
@@ -376,12 +382,12 @@
                     "AlarmNotification",
                     "ScheduledActions"
                 ],
-                "WaitOnResourceSignals" : true
+                "WaitOnResourceSignals" : "true"
               }
            },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "3",
+                    "Count": "1",
                     "Timeout": "PT5M"
                 }
             }
@@ -398,8 +404,8 @@
                 "HealthCheckProtocol": "HTTP",
                 "HealthCheckPath": "/ping",
                 "HealthCheckPort": 3000,
-                "HealthCheckIntervalSeconds": 10,
-                "HealthCheckTimeoutSeconds": 5,
+                "HealthCheckIntervalSeconds": 60,
+                "HealthCheckTimeoutSeconds": 10,
                 "HealthyThresholdCount": 2,
                 "UnhealthyThresholdCount": 10,
                 "Matcher": {
@@ -662,7 +668,17 @@
         "BranchNameOrSha": {
             "Description": "git branch name (latest) or SHA to be used",
             "Type": "String",
-            "ConstraintDescription": "must be the name of a valid branch of SHA (applies only to non-production environments)"
+            "ConstraintDescription": "must be the name of a valid branch or SHA (ignored in 'production' environment)"
+        },
+        "LcImageId": {
+            "Description": "AMI to use in the LaunchConfiguration",
+            "Type": "AWS::EC2::Image::Id",
+            "ConstraintDescription": "must be the id of a valid AMI"
+        },
+        "Asg1DesiredCapacity": {
+            "Description": "The DesiredCapacity of Asg1",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
         },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",

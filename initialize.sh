@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -xe
 
 sudo -H -i -u ubuntu bash -c "aws configure set s3.signature_version s3v4"
 sudo -H -i -u ubuntu bash -c "aws s3api get-object --bucket secrets-exper --key secrets .secrets"
