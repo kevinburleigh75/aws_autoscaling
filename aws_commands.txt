@@ -1,0 +1,7 @@
+aws cloudformation create-stack --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json --parameters ParameterKey=EnvName,ParameterValue=blah ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers ParameterKey=KeyName,ParameterValue=kevin_va_kp ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git ParameterKey=LcImageId,ParameterValue=ami-37884c4d ParameterKey=Asg1DesiredCapacity,ParameterValue=1 --stack-name Stack1
+
+aws cloudformation update-stack --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json --parameters ParameterKey=EnvName,ParameterValue=blah ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers ParameterKey=KeyName,ParameterValue=kevin_va_kp ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git ParameterKey=LcImageId,ParameterValue=ami-05679357ab362f128 ParameterKey=Asg1DesiredCapacity,ParameterValue=1 --stack-name Stack1
+
+aws cloudformation update-stack --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json --parameters ParameterKey=EnvName,ParameterValue=blah ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers ParameterKey=KeyName,ParameterValue=kevin_va_kp ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git ParameterKey=LcImageId,ParameterValue=ami-37884c4d ParameterKey=Asg1DesiredCapacity,ParameterValue=1 --stack-name Stack1
+
+aws cloudformation delete-stack --stack-name Stack1
