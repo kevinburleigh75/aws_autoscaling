@@ -8,7 +8,7 @@ AWS_REGION="$(curl --silent http://169.254.169.254/latest/dynamic/instance-ident
 aws configure set region $AWS_REGION
 AWS_ASG_NAME="$(aws autoscaling describe-auto-scaling-instances --instance-ids=$AWS_INSTANCE_ID --query 'AutoScalingInstances[0].AutoScalingGroupName' | sed -e 's/"//g')"
 AWS_ASG_LC_NAME="$(aws autoscaling describe-auto-scaling-instances --instance-ids=$AWS_INSTANCE_ID --query 'AutoScalingInstances[0].LaunchConfigurationName' | sed -e 's/"//g')"
-AWS_ASG_LC_IMAGE_ID="$(aws autoscaling describe-launch-configurations --launch-configuration-names=Stack1-LcElbExper-1EMHMBI13M9TD --query 'LaunchConfigurations[0].ImageId' | sed -e 's/"//g')"
+AWS_ASG_LC_IMAGE_ID="$(aws autoscaling describe-launch-configurations --launch-configuration-names=$AWS_ASG_LC_NAME --query 'LaunchConfigurations[0].ImageId' | sed -e 's/"//g')"
 AWS_ASG_MAX_SIZE="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $AWS_ASG_NAME --query 'AutoScalingGroups[0].MaxSize' | sed -e 's/"//g')"
 
 echo export AWS_INSTANCE_ID=$AWS_INSTANCE_ID         >> $AWSINFO_FILENAME
