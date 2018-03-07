@@ -349,16 +349,14 @@
                     "us-east-1b",
                     "us-east-1c"
                 ],
-                "DesiredCapacity": 3,
+                "DesiredCapacity": 1,
                 "MinSize": 1,
                 "MaxSize": 10,
                 "TargetGroupARNs": [
                     {
                         "Ref": "ElbGroup1"
                     }
-                ],
-                "HealthCheckGracePeriod": 60,
-                "HealthCheckType": "ELB"
+                ]
             },
             "Metadata": {
                 "AWS::CloudFormation::Designer": {
@@ -368,8 +366,8 @@
             "UpdatePolicy": {
               "AutoScalingRollingUpdate" : {
                 "MaxBatchSize" : 1,
-                "MinInstancesInService" : 3,
-                "MinSuccessfulInstancesPercent" : 100,
+                "MinInstancesInService" : 1,
+                "MinSuccessfulInstancesPercent" : 90,
                 "PauseTime" : "PT5M",
                 "SuspendProcesses" : [
                     "AZRebalance",
@@ -381,7 +379,7 @@
            },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "3",
+                    "Count": "1",
                     "Timeout": "PT5M"
                 }
             }
@@ -395,16 +393,6 @@
                         "Value": "20"
                     }
                 ],
-                "HealthCheckProtocol": "HTTP",
-                "HealthCheckPath": "/ping",
-                "HealthCheckPort": 3000,
-                "HealthCheckIntervalSeconds": 10,
-                "HealthCheckTimeoutSeconds": 5,
-                "HealthyThresholdCount": 2,
-                "UnhealthyThresholdCount": 10,
-                "Matcher": {
-                    "HttpCode": "200"
-                },
                 "Port": 3000,
                 "Protocol": "HTTP",
                 "VpcId": "vpc-b087e6d4"
@@ -454,18 +442,8 @@
                         "Value": "120"
                     }
                 ],
-                "HealthCheckIntervalSeconds": 20,
-                "HealthCheckProtocol": "HTTP",
-                "HealthCheckPath": "/ping",
-                "HealthCheckPort": 3000,
-                "HealthCheckTimeoutSeconds": 2,
-                "HealthyThresholdCount": 2,
-                "Matcher": {
-                    "HttpCode": "200"
-                },
                 "Port": 3000,
                 "Protocol": "HTTP",
-                "UnhealthyThresholdCount": 10,
                 "VpcId": "vpc-b087e6d4"
             },
             "Metadata": {
