@@ -11,10 +11,12 @@ AWS_ASG_LC_NAME="$(aws autoscaling describe-auto-scaling-instances --instance-id
 AWS_ASG_LC_IMAGE_ID="$(aws autoscaling describe-launch-configurations --launch-configuration-names=Stack1-LcElbExper-1EMHMBI13M9TD --query 'LaunchConfigurations[0].ImageId' | sed -e 's/"//g')"
 AWS_ASG_MAX_SIZE="$(aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names $AWS_ASG_NAME --query 'AutoScalingGroups[0].MaxSize' | sed -e 's/"//g')"
 
-echo export AWS_INSTANCE_ID=$AWS_INSTANCE_ID >> $AWSINFO_FILENAME
-echo export AWS_REGION=$AWS_REGION >> $AWSINFO_FILENAME
-echo export AWS_ASG_NAME=$AWS_ASG_NAME >> $AWSINFO_FILENAME
-echo export AWS_ASG_MAX_SIZE=$AWS_ASG_MAX_SIZE >> $AWSINFO_FILENAME
+echo export AWS_INSTANCE_ID=$AWS_INSTANCE_ID         >> $AWSINFO_FILENAME
+echo export AWS_REGION=$AWS_REGION                   >> $AWSINFO_FILENAME
+echo export AWS_ASG_NAME=$AWS_ASG_NAME               >> $AWSINFO_FILENAME
+echo export AWS_ASG_LC_NAME=$AWS_ASG_LC_NAME         >> $AWSINFO_FILENAME
+echo export AWS_ASG_LC_IMAGE_ID=$AWS_ASG_LC_IMAGE_ID >> $AWSINFO_FILENAME
+echo export AWS_ASG_MAX_SIZE=$AWS_ASG_MAX_SIZE       >> $AWSINFO_FILENAME
 
 echo ". $HOME/.awsinfo" >> $PROFILE_FILENAME
 
