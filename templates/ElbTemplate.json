@@ -185,6 +185,83 @@
         }
     },
     "Resources": {
+        "LcMigration": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": {
+                    "Ref": "MigrationLcImageId"
+                },
+                "InstanceType": "t2.micro",
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
+                                },
+                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_migration.sh\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MigrationAsg --region ${AWS::Region}\n"
+                                }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4"
+                },
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "default": [
+                            "cloneAndCheckout",
+                            "initialize"
+                        ]
+                    },
+                    "cloneAndCheckout": {
+                        "commands": {
+                            "01_clone": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not cloning repo because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"git clone ${RepoUrl} ./primary_repo\" "
+                                        }
+                                    ]
+                                }
+                            },
+                            "02_checkout": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not checking anything out because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ${BranchNameOrSha} \" "
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "initialize": {
+                        "commands": {
+                            "01_initialize": {
+                                "command": "/bin/bash initialize.sh",
+                                "cwd": "/home/ubuntu/primary_repo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "LcElbExper": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
@@ -259,6 +336,58 @@
                             }
                         }
                     }
+                }
+            }
+        },
+        "MigrationAsg": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": {
+                    "Ref": "LcMigration"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "asg-migration",
+                        "PropagateAtLaunch": "true"
+                    }
+                ],
+                "AvailabilityZones": [
+                    "us-east-1a",
+                    "us-east-1b",
+                    "us-east-1c"
+                ],
+                "DesiredCapacity": {
+                    "Ref": "MigrationDesiredCapacity"
+                },
+                "MinSize": 0,
+                "MaxSize": 10
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Designer": {
+                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
+                }
+            },
+            "UpdatePolicy": {
+              "AutoScalingRollingUpdate" : {
+                "MaxBatchSize" : 1,
+                "MinInstancesInService" : {
+                    "Ref": "MigrationDesiredCapacity"
+                },
+                "MinSuccessfulInstancesPercent" : 100,
+                "PauseTime" : "PT5M",
+                "SuspendProcesses" : [
+                    "AZRebalance",
+                    "AlarmNotification",
+                    "ScheduledActions"
+                ],
+                "WaitOnResourceSignals" : "true"
+              }
+           },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Count": "1",
+                    "Timeout": "PT5M"
                 }
             }
         },
@@ -677,6 +806,16 @@
         },
         "Asg1DesiredCapacity": {
             "Description": "The DesiredCapacity of Asg1",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "MigrationLcImageId": {
+            "Description": "AMI to use in the migration LaunchConfiguration",
+            "Type": "AWS::EC2::Image::Id",
+            "ConstraintDescription": "must be the id of a valid AMI"
+        },
+        "MigrationDesiredCapacity": {
+            "Description": "The DesiredCapacity of MigrationAsg",
             "Type": "Number",
             "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
         },
