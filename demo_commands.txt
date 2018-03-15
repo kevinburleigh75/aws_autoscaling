@@ -1,0 +1,93 @@
+##
+## INITIAL STACK CREATION
+##
+
+export LC_IMAGE_ID=ami-37884c4d
+export DESIRED_CAPACITY=3
+
+export MIGRATION_LC_IMAGE_ID=ami-37884c4d
+export MIGRATION_DESIRED_CAPACITY=0
+
+aws cloudformation create-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=LcImageId,ParameterValue=$LC_IMAGE_ID \
+      ParameterKey=MigrationLcImageId,ParameterValue=$MIGRATION_LC_IMAGE_ID \
+      ParameterKey=MigrationDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=Asg1DesiredCapacity,ParameterValue=$DESIRED_CAPACITY \
+  --stack-name Stack1
+
+##
+## MIGRATION DEPLOYMENT
+##
+
+export LC_IMAGE_ID=ami-37884c4d
+export DESIRED_CAPACITY=3
+
+export MIGRATION_LC_IMAGE_ID=ami-05679357ab362f128
+export MIGRATION_DESIRED_CAPACITY=1
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=LcImageId,ParameterValue=$LC_IMAGE_ID \
+      ParameterKey=MigrationLcImageId,ParameterValue=$MIGRATION_LC_IMAGE_ID \
+      ParameterKey=MigrationDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=Asg1DesiredCapacity,ParameterValue=$DESIRED_CAPACITY \
+  --stack-name Stack1
+
+ssh -i ~/.ssh/kevin_va_kp.pem -t ubuntu@54.175.94.176 ls
+
+##
+## CODE DEPLOYMENT
+##
+
+export LC_IMAGE_ID=ami-05679357ab362f128
+export DESIRED_CAPACITY=3
+
+export MIGRATION_LC_IMAGE_ID=ami-05679357ab362f128
+export MIGRATION_DESIRED_CAPACITY=0
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=LcImageId,ParameterValue=$LC_IMAGE_ID \
+      ParameterKey=MigrationLcImageId,ParameterValue=$MIGRATION_LC_IMAGE_ID \
+      ParameterKey=MigrationDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=Asg1DesiredCapacity,ParameterValue=$DESIRED_CAPACITY \
+  --stack-name Stack1
+
+##
+## RESET
+##
+
+export LC_IMAGE_ID=ami-37884c4d
+export DESIRED_CAPACITY=3
+
+export MIGRATION_LC_IMAGE_ID=ami-37884c4d
+export MIGRATION_DESIRED_CAPACITY=0
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=LcImageId,ParameterValue=$LC_IMAGE_ID \
+      ParameterKey=MigrationLcImageId,ParameterValue=$MIGRATION_LC_IMAGE_ID \
+      ParameterKey=MigrationDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=Asg1DesiredCapacity,ParameterValue=$DESIRED_CAPACITY \
+  --stack-name Stack1
