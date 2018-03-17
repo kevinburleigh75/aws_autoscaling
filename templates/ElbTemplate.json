@@ -1,195 +1,11 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Metadata": {
-        "AWS::CloudFormation::Designer": {
-            "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 670,
-                    "y": 110
-                },
-                "z": 0,
-                "embeds": []
-            },
-            "6f7ea462-5a95-448f-a9d4-34feb9483e65": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 470,
-                    "y": 40
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4",
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
-                ]
-            },
-            "1da9b131-7370-48c0-94cc-3e020c2ded4f": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": -110,
-                    "y": 50
-                },
-                "z": 0,
-                "embeds": []
-            },
-            "d5ebcac0-c964-4a18-9809-d050b006bf86": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 10,
-                    "y": 50
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                ]
-            },
-            "fa8c2d21-6092-492a-b15f-4eca448b61d5": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 130,
-                    "y": 50
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                ]
-            },
-            "0b0f7f27-642a-4abc-bda0-27e25ae6371a": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 240,
-                    "y": 40
-                },
-                "z": 0,
-                "embeds": []
-            },
-            "f1fa2249-c23c-4346-b255-96613a553d22": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 130,
-                    "y": 180
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                ]
-            },
-            "95a11158-749f-4146-9919-fc5eae51bf05": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 240,
-                    "y": 180
-                },
-                "z": 0,
-                "embeds": []
-            },
-            "6c1ef4a8-64e2-4358-9234-34806834610c": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 470,
-                    "y": 180
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4",
-                    "0b0f7f27-642a-4abc-bda0-27e25ae6371a",
-                    "95a11158-749f-4146-9919-fc5eae51bf05"
-                ]
-            },
-            "62879a53-390a-48e1-88bc-9abdf06452c8": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 580,
-                    "y": -70
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                ]
-            },
-            "6aa655c5-56bb-429c-b651-97a742ed0567": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 710,
-                    "y": -70
-                },
-                "z": 0,
-                "embeds": [],
-                "isassociatedwith": [
-                    "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                ]
-            },
-            "3cc50e63-3ae8-406b-8aba-789b13545886": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 580,
-                    "y": -190
-                },
-                "z": 0,
-                "embeds": []
-            },
-            "3c557255-ff40-4cb5-8552-898ce7ac2f0e": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 710,
-                    "y": -190
-                },
-                "z": 0,
-                "embeds": []
-            }
-        }
-    },
     "Resources": {
-        "LcMigration": {
+        "MigrationLc": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
                 "ImageId": {
-                    "Ref": "MigrationLcImageId"
+                    "Ref": "MigrationImageId"
                 },
                 "InstanceType": "t2.micro",
                 "SecurityGroups": [
@@ -203,7 +19,7 @@
                             [
                                 "#!/bin/bash -xe\n",
                                 {
-                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MigrationLc\n"
                                 },
                                 "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_migration.sh\n",
                                 {
@@ -215,9 +31,6 @@
                 }
             },
             "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4"
-                },
                 "AWS::CloudFormation::Init": {
                     "configSets": {
                         "default": [
@@ -262,11 +75,11 @@
                 }
             }
         },
-        "LcElbExper": {
+        "OneLc": {
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
                 "ImageId": {
-                    "Ref": "LcImageId"
+                    "Ref": "NonMigrationImageId"
                 },
                 "InstanceType": "t2.micro",
                 "SecurityGroups": [
@@ -280,11 +93,11 @@
                             [
                                 "#!/bin/bash -xe\n",
                                 {
-                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource LcElbExper\n"
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource OneLc\n"
                                 },
-                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init.sh\n",
+                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_one.sh\n",
                                 {
-                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Asg1 --region ${AWS::Region}\n"
+                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource OneAsg --region ${AWS::Region}\n"
                                 }
                             ]
                         ]
@@ -292,9 +105,80 @@
                 }
             },
             "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "f848630b-1d25-48aa-ac36-7eb2d9ffb8c4"
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "default": [
+                            "cloneAndCheckout",
+                            "initialize"
+                        ]
+                    },
+                    "cloneAndCheckout": {
+                        "commands": {
+                            "01_clone": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not cloning repo because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"git clone ${RepoUrl} ./primary_repo\" "
+                                        }
+                                    ]
+                                }
+                            },
+                            "02_checkout": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not checking anything out because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ${BranchNameOrSha} \" "
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "initialize": {
+                        "commands": {
+                            "01_initialize": {
+                                "command": "/bin/bash initialize.sh",
+                                "cwd": "/home/ubuntu/primary_repo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "TwoLc": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": {
+                    "Ref": "NonMigrationImageId"
                 },
+                "InstanceType": "t2.micro",
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource TwoLc\n"
+                                },
+                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_two.sh\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource TwoAsg --region ${AWS::Region}\n"
+                                }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
                 "AWS::CloudFormation::Init": {
                     "configSets": {
                         "default": [
@@ -343,7 +227,7 @@
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "LaunchConfigurationName": {
-                    "Ref": "LcMigration"
+                    "Ref": "MigrationLc"
                 },
                 "Tags": [
                     {
@@ -358,21 +242,16 @@
                     "us-east-1c"
                 ],
                 "DesiredCapacity": {
-                    "Ref": "MigrationDesiredCapacity"
+                    "Ref": "MigrationAsgDesiredCapacity"
                 },
                 "MinSize": 0,
                 "MaxSize": 10
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                }
             },
             "UpdatePolicy": {
               "AutoScalingRollingUpdate" : {
                 "MaxBatchSize" : 1,
                 "MinInstancesInService" : {
-                    "Ref": "MigrationDesiredCapacity"
+                    "Ref": "MigrationAsgDesiredCapacity"
                 },
                 "MinSuccessfulInstancesPercent" : 100,
                 "PauseTime" : "PT5M",
@@ -386,7 +265,9 @@
            },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "1",
+                    "Count": {
+                        "Ref": "MigrationAsgDesiredCapacity"
+                    },
                     "Timeout": "PT5M"
                 }
             }
@@ -402,11 +283,6 @@
                     "subnet-fc93e699",
                     "subnet-fdab4cd7"
                 ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "1da9b131-7370-48c0-94cc-3e020c2ded4f"
-                }
             }
         },
         "ElbListener": {
@@ -425,11 +301,6 @@
                 ],
                 "Port": "3000",
                 "Protocol": "HTTP"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "d5ebcac0-c964-4a18-9809-d050b006bf86"
-                }
             }
         },
         "ElbRule1": {
@@ -455,23 +326,18 @@
                     }
                 ],
                 "Priority": 1
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "fa8c2d21-6092-492a-b15f-4eca448b61d5"
-                }
             }
         },
-        "Asg1": {
+        "OneAsg": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "LaunchConfigurationName": {
-                    "Ref": "LcElbExper"
+                    "Ref": "OneLc"
                 },
                 "Tags": [
                     {
                         "Key": "Name",
-                        "Value": "asg-external-1",
+                        "Value": "asg-one",
                         "PropagateAtLaunch": "true"
                     }
                 ],
@@ -481,7 +347,7 @@
                     "us-east-1c"
                 ],
                 "DesiredCapacity": {
-                    "Ref": "Asg1DesiredCapacity"
+                    "Ref": "OneAsgDesiredCapacity"
                 },
                 "MinSize": 1,
                 "MaxSize": 10,
@@ -493,16 +359,11 @@
                 "HealthCheckType": "ELB",
                 "HealthCheckGracePeriod": 30
             },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "6f7ea462-5a95-448f-a9d4-34feb9483e65"
-                }
-            },
             "UpdatePolicy": {
               "AutoScalingRollingUpdate" : {
                 "MaxBatchSize" : 2,
                 "MinInstancesInService" : {
-                    "Ref": "Asg1DesiredCapacity"
+                    "Ref": "OneAsgDesiredCapacity"
                 },
                 "MinSuccessfulInstancesPercent" : 100,
                 "PauseTime" : "PT5M",
@@ -543,11 +404,6 @@
                 "Port": 3000,
                 "Protocol": "HTTP",
                 "VpcId": "vpc-b087e6d4"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "0b0f7f27-642a-4abc-bda0-27e25ae6371a"
-                }
             }
         },
         "ElbRule2": {
@@ -573,11 +429,6 @@
                     }
                 ],
                 "Priority": 2
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "f1fa2249-c23c-4346-b255-96613a553d22"
-                }
             }
         },
         "ElbGroup2": {
@@ -602,18 +453,13 @@
                 "Protocol": "HTTP",
                 "UnhealthyThresholdCount": 10,
                 "VpcId": "vpc-b087e6d4"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "95a11158-749f-4146-9919-fc5eae51bf05"
-                }
             }
         },
-        "Asg2": {
+        "TwoAsg": {
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "LaunchConfigurationName": {
-                    "Ref": "LcElbExper"
+                    "Ref": "TwoLc"
                 },
                 "TargetGroupARNs": [
                     {
@@ -623,7 +469,7 @@
                 "Tags": [
                     {
                         "Key": "Name",
-                        "Value": "asg-external-2",
+                        "Value": "asg-two",
                         "PropagateAtLaunch": "true"
                     }
                 ],
@@ -632,21 +478,18 @@
                     "us-east-1b",
                     "us-east-1c"
                 ],
-                "DesiredCapacity": 1,
+                "DesiredCapacity": {
+                    "Ref": "TwoAsgDesiredCapacity"
+                },
                 "MinSize": 1,
                 "MaxSize": 10
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "6c1ef4a8-64e2-4358-9234-34806834610c"
-                }
             }
         },
         "Task1TooFewRequestsPolicy": {
             "Type": "AWS::AutoScaling::ScalingPolicy",
             "Properties": {
                 "AutoScalingGroupName": {
-                    "Ref": "Asg1"
+                    "Ref": "OneAsg"
                 },
                 "AdjustmentType": "ChangeInCapacity",
                 "PolicyType": "StepScaling",
@@ -666,18 +509,13 @@
                         "ScalingAdjustment": -3
                     }
                 ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "62879a53-390a-48e1-88bc-9abdf06452c8"
-                }
             }
         },
         "Task1TooManyRequestsPolicy": {
             "Type": "AWS::AutoScaling::ScalingPolicy",
             "Properties": {
                 "AutoScalingGroupName": {
-                    "Ref": "Asg1"
+                    "Ref": "OneAsg"
                 },
                 "AdjustmentType": "ChangeInCapacity",
                 "EstimatedInstanceWarmup": 60,
@@ -703,11 +541,6 @@
                         "ScalingAdjustment": 10
                     }
                 ]
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "6aa655c5-56bb-429c-b651-97a742ed0567"
-                }
             }
         },
         "Task1TooFewRequestsAlarm": {
@@ -739,11 +572,6 @@
                 "Period": "60",
                 "EvaluationPeriods": "3",
                 "TreatMissingData": "missing"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "3cc50e63-3ae8-406b-8aba-789b13545886"
-                }
             }
         },
         "Task1TooManyRequestsAlarm": {
@@ -775,11 +603,6 @@
                 "Period": "60",
                 "EvaluationPeriods": "1",
                 "TreatMissingData": "missing"
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "3c557255-ff40-4cb5-8552-898ce7ac2f0e"
-                }
             }
         }
     },
@@ -799,22 +622,27 @@
             "Type": "String",
             "ConstraintDescription": "must be the name of a valid branch or SHA (ignored in 'production' environment)"
         },
-        "LcImageId": {
-            "Description": "AMI to use in the LaunchConfiguration",
+        "NonMigrationImageId": {
+            "Description": "AMI to use in the non-migration LaunchConfiguration",
             "Type": "AWS::EC2::Image::Id",
             "ConstraintDescription": "must be the id of a valid AMI"
         },
-        "Asg1DesiredCapacity": {
-            "Description": "The DesiredCapacity of Asg1",
+        "OneAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of OneAsg",
             "Type": "Number",
             "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
         },
-        "MigrationLcImageId": {
+        "TwoAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of TwoAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "MigrationImageId": {
             "Description": "AMI to use in the migration LaunchConfiguration",
             "Type": "AWS::EC2::Image::Id",
             "ConstraintDescription": "must be the id of a valid AMI"
         },
-        "MigrationDesiredCapacity": {
+        "MigrationAsgDesiredCapacity": {
             "Description": "The DesiredCapacity of MigrationAsg",
             "Type": "Number",
             "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
