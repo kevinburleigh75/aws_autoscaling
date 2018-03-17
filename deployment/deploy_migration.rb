@@ -89,7 +89,9 @@ def wait_for_update_to_complete(stack_info:)
 end
 
 def start_migration_server(image_info:, stack_info:, migration_asg_info:, non_migration_asg_infos:)
-  asg1_desired_capacity = non_migration_asg_infos.detect{|info| info[:asg_physical_id] =~ %r{Asg1}}[:desired_capacity]
+  non_migration_asg_desired_capacity_params = non_migration_asg_infos.map{ |info|
+    "ParameterKey=#{%r{.*-([^-]*?)-[^-]*$}.match(info[:asg_physical_id])[1]}DesiredCapacity,ParameterValue=#{info[:desired_capacity]}"
+  }.join(' ')
 
   cmd = <<~ENDCMD
   aws cloudformation update-stack \
@@ -100,10 +102,10 @@ def start_migration_server(image_info:, stack_info:, migration_asg_info:, non_mi
         ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
         ParameterKey=KeyName,ParameterValue=kevin_va_kp \
         ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
-        ParameterKey=LcImageId,ParameterValue=#{image_info[:old_image_id]} \
-        ParameterKey=MigrationLcImageId,ParameterValue=#{image_info[:new_image_id]} \
-        ParameterKey=MigrationDesiredCapacity,ParameterValue=1 \
-        ParameterKey=Asg1DesiredCapacity,ParameterValue=#{asg1_desired_capacity} \
+        ParameterKey=NonMigrationImageId,ParameterValue=#{image_info[:old_image_id]} \
+        ParameterKey=MigrationImageId,ParameterValue=#{image_info[:new_image_id]} \
+        ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=1 \
+        #{non_migration_asg_desired_capacity_params} \
     --output json
   ENDCMD
   puts "cmd = (#{cmd})"
@@ -154,7 +156,9 @@ def wait_for_migration_to_complete(migration_asg_info:)
 end
 
 def stop_migration_server(image_info:, stack_info:, migration_asg_info:, non_migration_asg_infos:)
-  asg1_desired_capacity = non_migration_asg_infos.detect{|info| info[:asg_physical_id] =~ %r{Asg1}}[:desired_capacity]
+  non_migration_asg_desired_capacity_params = non_migration_asg_infos.map{ |info|
+    "ParameterKey=#{%r{.*-([^-]*?)-[^-]*$}.match(info[:asg_physical_id])[1]}DesiredCapacity,ParameterValue=#{info[:desired_capacity]}"
+  }.join(' ')
 
   cmd = <<~ENDCMD
   aws cloudformation update-stack \
@@ -165,10 +169,10 @@ def stop_migration_server(image_info:, stack_info:, migration_asg_info:, non_mig
         ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
         ParameterKey=KeyName,ParameterValue=kevin_va_kp \
         ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
-        ParameterKey=LcImageId,ParameterValue=#{image_info[:old_image_id]} \
-        ParameterKey=MigrationLcImageId,ParameterValue=#{image_info[:new_image_id]} \
-        ParameterKey=MigrationDesiredCapacity,ParameterValue=0 \
-        ParameterKey=Asg1DesiredCapacity,ParameterValue=#{asg1_desired_capacity} \
+        ParameterKey=NonMigrationImageId,ParameterValue=#{image_info[:old_image_id]} \
+        ParameterKey=MigrationImageId,ParameterValue=#{image_info[:new_image_id]} \
+        ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=0 \
+        #{non_migration_asg_desired_capacity_params} \
     --output json
   ENDCMD
   puts "cmd = (#{cmd})"
