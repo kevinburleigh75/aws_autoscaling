@@ -1,0 +1,465 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "EnvName": {
+            "Description": "Name for this environment",
+            "Type": "String",
+            "ConstraintDescription": "'production' is special because image update will not occur, but otherwise almost anything goes"
+        },
+        "RepoUrl": {
+            "Description": "URL for git clone operation",
+            "Type": "String",
+            "ConstraintDescription": "must be the URL of an existing GitHub repo (applies only to non-production environments)"
+        },
+        "BranchNameOrSha": {
+            "Description": "git branch name (latest) or SHA to be used",
+            "Type": "String",
+            "ConstraintDescription": "must be the name of a valid branch or SHA (ignored in 'production' environment)"
+        },
+        "ElbAsgStackTemplateUrl": {
+            "Description": "S3 template URL",
+            "Type": "String",
+            "ConstraintDescription": "must point to a valid template"
+        },
+        "NonMigrationImageId": {
+            "Description": "AMI to use in the non-migration LaunchConfiguration",
+            "Type": "AWS::EC2::Image::Id",
+            "ConstraintDescription": "must be the id of a valid AMI"
+        },
+        "OneAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of OneAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "TwoAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of TwoAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "MigrationImageId": {
+            "Description": "AMI to use in the migration LaunchConfiguration",
+            "Type": "AWS::EC2::Image::Id",
+            "ConstraintDescription": "must be the id of a valid AMI"
+        },
+        "MigrationAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of MigrationAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        }
+    },
+    "Resources": {
+        "MigrationLc": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": {
+                    "Ref": "MigrationImageId"
+                },
+                "InstanceType": "t2.micro",
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource MigrationLc\n"
+                                },
+                                "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_migration.sh\n",
+                                {
+                                    "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource MigrationAsg --region ${AWS::Region}\n"
+                                }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "default": [
+                            "cloneAndCheckout",
+                            "initialize"
+                        ]
+                    },
+                    "cloneAndCheckout": {
+                        "commands": {
+                            "01_clone": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not cloning repo because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"git clone ${RepoUrl} ./primary_repo\" "
+                                        }
+                                    ]
+                                }
+                            },
+                            "02_checkout": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not checking anything out because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ${BranchNameOrSha} \" "
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "initialize": {
+                        "commands": {
+                            "01_initialize": {
+                                "command": "/bin/bash initialize.sh",
+                                "cwd": "/home/ubuntu/primary_repo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "MigrationAsg": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": {
+                    "Ref": "MigrationLc"
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": "asg-migration",
+                        "PropagateAtLaunch": "true"
+                    }
+                ],
+                "AvailabilityZones": [
+                    "us-east-1a",
+                    "us-east-1b",
+                    "us-east-1c"
+                ],
+                "DesiredCapacity": {
+                    "Ref": "MigrationAsgDesiredCapacity"
+                },
+                "MinSize": 0,
+                "MaxSize": 10
+            },
+            "UpdatePolicy": {
+              "AutoScalingRollingUpdate" : {
+                "MaxBatchSize" : 1,
+                "MinInstancesInService" : {
+                    "Ref": "MigrationAsgDesiredCapacity"
+                },
+                "MinSuccessfulInstancesPercent" : 100,
+                "PauseTime" : "PT5M",
+                "SuspendProcesses" : [
+                    "AZRebalance",
+                    "AlarmNotification",
+                    "ScheduledActions"
+                ],
+                "WaitOnResourceSignals" : "true"
+              }
+           },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Count": {
+                        "Ref": "MigrationAsgDesiredCapacity"
+                    },
+                    "Timeout": "PT5M"
+                }
+            }
+        },
+        "Elb": {
+            "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
+            "Properties": {
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "Subnets": [
+                    "subnet-206ebe56",
+                    "subnet-fc93e699",
+                    "subnet-fdab4cd7"
+                ]
+            }
+        },
+        "ElbListener": {
+            "Type": "AWS::ElasticLoadBalancingV2::Listener",
+            "Properties": {
+                "LoadBalancerArn": {
+                    "Ref": "Elb"
+                },
+                "DefaultActions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup1"
+                        }
+                    }
+                ],
+                "Port": "3000",
+                "Protocol": "HTTP"
+            }
+        },
+        "ElbRule1": {
+            "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+            "Properties": {
+                "ListenerArn": {
+                    "Ref": "ElbListener"
+                },
+                "Actions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup1"
+                        }
+                    }
+                ],
+                "Conditions": [
+                    {
+                        "Field": "path-pattern",
+                        "Values": [
+                            "/task1"
+                        ]
+                    }
+                ],
+                "Priority": 1
+            }
+        },
+        "ElbGroup1": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "TargetGroupAttributes": [
+                    {
+                        "Key": "deregistration_delay.timeout_seconds",
+                        "Value": "20"
+                    }
+                ],
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckPath": "/ping",
+                "HealthCheckPort": 3000,
+                "HealthCheckIntervalSeconds": 60,
+                "HealthCheckTimeoutSeconds": 10,
+                "HealthyThresholdCount": 2,
+                "UnhealthyThresholdCount": 10,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Port": 3000,
+                "Protocol": "HTTP",
+                "VpcId": "vpc-b087e6d4"
+            }
+        },
+        "ElbRule2": {
+            "Type": "AWS::ElasticLoadBalancingV2::ListenerRule",
+            "Properties": {
+                "ListenerArn": {
+                    "Ref": "ElbListener"
+                },
+                "Actions": [
+                    {
+                        "Type": "forward",
+                        "TargetGroupArn": {
+                            "Ref": "ElbGroup2"
+                        }
+                    }
+                ],
+                "Conditions": [
+                    {
+                        "Field": "path-pattern",
+                        "Values": [
+                            "/task2"
+                        ]
+                    }
+                ],
+                "Priority": 2
+            }
+        },
+        "ElbGroup2": {
+            "Type": "AWS::ElasticLoadBalancingV2::TargetGroup",
+            "Properties": {
+                "TargetGroupAttributes": [
+                    {
+                        "Key": "deregistration_delay.timeout_seconds",
+                        "Value": "120"
+                    }
+                ],
+                "HealthCheckIntervalSeconds": 20,
+                "HealthCheckProtocol": "HTTP",
+                "HealthCheckPath": "/ping",
+                "HealthCheckPort": 3000,
+                "HealthCheckTimeoutSeconds": 2,
+                "HealthyThresholdCount": 2,
+                "Matcher": {
+                    "HttpCode": "200"
+                },
+                "Port": 3000,
+                "Protocol": "HTTP",
+                "UnhealthyThresholdCount": 10,
+                "VpcId": "vpc-b087e6d4"
+            }
+        },
+        "OneAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "ElbAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "NonMigrationImageId" },
+                    "DesiredCapacity":      { "Ref": "OneAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-one-instance",
+                    "TargetGroupArn":       { "Ref": "ElbGroup1" },
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_one.sh",
+                    "KeyName":              { "Ref": "KeyName" }
+                }
+            }
+        },
+        "TwoAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "ElbAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "NonMigrationImageId" },
+                    "DesiredCapacity":      { "Ref": "TwoAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-two-instance",
+                    "TargetGroupArn":       { "Ref": "ElbGroup2" },
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_two.sh",
+                    "KeyName":              { "Ref": "KeyName" }
+                }
+            }
+        },
+        "Task1TooFewRequestsPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AutoScalingGroupName": { "Fn::GetAtt": [ "OneAsgStack", "Outputs.Asg"] },
+                "AdjustmentType": "ChangeInCapacity",
+                "PolicyType": "StepScaling",
+                "StepAdjustments": [
+                    {
+                        "MetricIntervalUpperBound": 0,
+                        "MetricIntervalLowerBound": -50,
+                        "ScalingAdjustment": -1
+                    },
+                    {
+                        "MetricIntervalUpperBound": -50,
+                        "MetricIntervalLowerBound": -100,
+                        "ScalingAdjustment": -2
+                    },
+                    {
+                        "MetricIntervalUpperBound": -100,
+                        "ScalingAdjustment": -3
+                    }
+                ]
+            }
+        },
+        "Task1TooManyRequestsPolicy": {
+            "Type": "AWS::AutoScaling::ScalingPolicy",
+            "Properties": {
+                "AutoScalingGroupName": { "Fn::GetAtt": [ "OneAsgStack", "Outputs.Asg"] },
+                "AdjustmentType": "ChangeInCapacity",
+                "EstimatedInstanceWarmup": 60,
+                "PolicyType": "StepScaling",
+                "StepAdjustments": [
+                    {
+                        "MetricIntervalLowerBound": 0,
+                        "MetricIntervalUpperBound": 200,
+                        "ScalingAdjustment": 1
+                    },
+                    {
+                        "MetricIntervalLowerBound": 200,
+                        "MetricIntervalUpperBound": 500,
+                        "ScalingAdjustment": 2
+                    },
+                    {
+                        "MetricIntervalLowerBound": 500,
+                        "MetricIntervalUpperBound": 800,
+                        "ScalingAdjustment": 3
+                    },
+                    {
+                        "MetricIntervalLowerBound": 800,
+                        "ScalingAdjustment": 10
+                    }
+                ]
+            }
+        },
+        "Task1TooFewRequestsAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": { "Fn::Sub": "${AWS::StackName}-Task1TooFewRequestsAlarm" },
+                "AlarmDescription": "Task1 requests/instance below threshold",
+                "AlarmActions": [
+                    { "Ref": "Task1TooFewRequestsPolicy" }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "TargetGroup",
+                        "Value": {
+                            "Fn::GetAtt": [
+                                "ElbGroup1",
+                                "TargetGroupFullName"
+                            ]
+                        }
+                    }
+                ],
+                "Namespace": "AWS/ApplicationELB",
+                "MetricName": "RequestCountPerTarget",
+                "Statistic": "Sum",
+                "ComparisonOperator": "LessThanOrEqualToThreshold",
+                "Threshold": "150",
+                "Period": "60",
+                "EvaluationPeriods": "3",
+                "TreatMissingData": "missing"
+            }
+        },
+        "Task1TooManyRequestsAlarm": {
+            "Type": "AWS::CloudWatch::Alarm",
+            "Properties": {
+                "AlarmName": { "Fn::Sub": "${AWS::StackName}-Task1TooManyRequestsAlarm" },
+                "AlarmDescription": "Task1 requests/instance above threshold",
+                "AlarmActions": [
+                    { "Ref": "Task1TooManyRequestsPolicy" }
+                ],
+                "Dimensions": [
+                    {
+                        "Name": "TargetGroup",
+                        "Value": {
+                            "Fn::GetAtt": [
+                                "ElbGroup1",
+                                "TargetGroupFullName"
+                            ]
+                        }
+                    }
+                ],
+                "Namespace": "AWS/ApplicationELB",
+                "MetricName": "RequestCountPerTarget",
+                "Statistic": "Sum",
+                "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+                "Threshold": "400",
+                "Period": "60",
+                "EvaluationPeriods": "1",
+                "TreatMissingData": "missing"
+            }
+        }
+    },
+    "Conditions": {
+        "IsProduction": {
+            "Fn::Equals": [
+                {
+                    "Ref": "EnvName"
+                },
+                "production"
+            ]
+        }
+    }
+}

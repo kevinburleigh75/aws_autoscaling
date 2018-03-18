@@ -1,0 +1,180 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "EnvName": {
+            "Description": "Name for this environment",
+            "Type": "String",
+            "ConstraintDescription": "'production' is special because image update will not occur, but otherwise almost anything goes"
+        },
+        "RepoUrl": {
+            "Description": "URL for git clone operation",
+            "Type": "String",
+            "ConstraintDescription": "must be the URL of an existing GitHub repo (applies only to non-production environments)"
+        },
+        "BranchNameOrSha": {
+            "Description": "git branch name (latest) or SHA to be used",
+            "Type": "String",
+            "ConstraintDescription": "must be the name of a valid branch or SHA (ignored in 'production' environment)"
+        },
+        "ImageId": {
+            "Description": "AMI to use in the LaunchConfiguration",
+            "Type": "AWS::EC2::Image::Id",
+            "ConstraintDescription": "must be the id of a valid AMI"
+        },
+        "DesiredCapacity": {
+            "Description": "The DesiredCapacity of OneAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "InstanceTagName": {
+            "Description": "value of the Name tag on ASG instances",
+            "Type": "String",
+            "ConstraintDescription": "pretty much anything goes"
+        },
+        "TargetGroupArn": {
+            "Description": "ELB Target Group ARN",
+            "Type": "String",
+            "ConstraintDescription": "Must be a valid Target Group ARN"
+        },
+        "PostCfnInitCommand": {
+            "Description": "Command to run after cfn-init complete and before cfn-signal, or \"\"",
+            "Type": "String",
+            "ConstraintDescription": "E.g., \"/bin/bash -xe /home/ubuntu/primary_repo/services/some_script.sh\n\""
+        },
+        "KeyName": {
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Type": "AWS::EC2::KeyPair::KeyName",
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+        }
+    },
+    "Outputs": {
+        "Asg": {
+          "Value": { "Ref": "Asg"}
+        }
+    },
+    "Resources": {
+        "Lc": {
+            "Type": "AWS::AutoScaling::LaunchConfiguration",
+            "Properties": {
+                "ImageId": { "Ref": "ImageId" },
+                "InstanceType": "t2.micro",
+                "SecurityGroups": [
+                    "sg-9f7085ec"
+                ],
+                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                { "Fn::Sub": "/usr/local/bin/cfn-init -v --stack ${AWS::StackName} --resource Lc\n" },
+                                { "Ref": "PostCfnInitCommand" },
+                                "\n",
+                                { "Fn::Sub": "/usr/local/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource Asg --region ${AWS::Region}\n" }
+                            ]
+                        ]
+                    }
+                }
+            },
+            "Metadata": {
+                "AWS::CloudFormation::Init": {
+                    "configSets": {
+                        "default": [
+                            "cloneAndCheckout",
+                            "initialize"
+                        ]
+                    },
+                    "cloneAndCheckout": {
+                        "commands": {
+                            "01_clone": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not cloning repo because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"git clone ${RepoUrl} ./primary_repo\" "
+                                        }
+                                    ]
+                                }
+                            },
+                            "02_checkout": {
+                                "command": {
+                                    "Fn::If": [
+                                        "IsProduction",
+                                        "echo not checking anything out because this is the production environment",
+                                        {
+                                            "Fn::Sub": "sudo -H -i -u ubuntu bash -c \"cd primary_repo; git checkout ${BranchNameOrSha} \" "
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "initialize": {
+                        "commands": {
+                            "01_initialize": {
+                                "command": "/bin/bash initialize.sh",
+                                "cwd": "/home/ubuntu/primary_repo"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "Asg": {
+            "Type": "AWS::AutoScaling::AutoScalingGroup",
+            "Properties": {
+                "LaunchConfigurationName": { "Ref": "Lc" },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Ref": "InstanceTagName" },
+                        "PropagateAtLaunch": "true"
+                    }
+                ],
+                "AvailabilityZones": [
+                    "us-east-1a",
+                    "us-east-1b",
+                    "us-east-1c"
+                ],
+                "DesiredCapacity": { "Ref": "DesiredCapacity" },
+                "MinSize": 1,
+                "MaxSize": 10,
+                "TargetGroupARNs": [
+                    { "Ref": "TargetGroupArn" }
+                ],
+                "HealthCheckType": "ELB",
+                "HealthCheckGracePeriod": 30
+            },
+            "UpdatePolicy": {
+                "AutoScalingRollingUpdate" : {
+                    "MaxBatchSize" : 2,
+                    "MinInstancesInService" : { "Ref": "DesiredCapacity" },
+                    "MinSuccessfulInstancesPercent" : 100,
+                    "PauseTime" : "PT5M",
+                    "SuspendProcesses" : [
+                        "AZRebalance",
+                        "AlarmNotification",
+                        "ScheduledActions"
+                    ],
+                    "WaitOnResourceSignals" : "true"
+                }
+            },
+            "CreationPolicy": {
+                "ResourceSignal": {
+                    "Count": { "Ref": "DesiredCapacity" },
+                    "Timeout": "PT5M"
+                }
+            }
+        }
+    },
+    "Conditions": {
+        "IsProduction": {
+            "Fn::Equals": [
+                { "Ref": "EnvName" },
+                "production"
+            ]
+        }
+    }
+}
