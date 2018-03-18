@@ -377,7 +377,9 @@
            },
             "CreationPolicy": {
                 "ResourceSignal": {
-                    "Count": "1",
+                    "Count": {
+                        "Ref": "OneAsgDesiredCapacity"
+                    },
                     "Timeout": "PT5M"
                 }
             }
