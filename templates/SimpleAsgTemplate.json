@@ -41,11 +41,6 @@
             "Type": "String",
             "ConstraintDescription": "pretty much anything goes"
         },
-        "TargetGroupArn": {
-            "Description": "ELB Target Group ARN",
-            "Type": "String",
-            "ConstraintDescription": "Must be a valid Target Group ARN"
-        },
         "PostCfnInitCommand": {
             "Description": "Command to run after cfn-init complete and before cfn-signal, or \"\"",
             "Type": "String",
@@ -150,12 +145,7 @@
                 ],
                 "DesiredCapacity": { "Ref": "DesiredCapacity" },
                 "MinSize":         { "Ref": "MinSize" },
-                "MaxSize":         { "Ref": "MaxSize" },
-                "TargetGroupARNs": [
-                    { "Ref": "TargetGroupArn" }
-                ],
-                "HealthCheckType": "ELB",
-                "HealthCheckGracePeriod": 30
+                "MaxSize":         { "Ref": "MaxSize" }
             },
             "UpdatePolicy": {
                 "AutoScalingRollingUpdate" : {

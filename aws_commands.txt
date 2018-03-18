@@ -129,6 +129,7 @@ aws cloudformation create-stack \
       ParameterKey=KeyName,ParameterValue=kevin_va_kp \
       ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
       ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
+      ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
       ParameterKey=NonMigrationImageId,ParameterValue=$NON_MIGRATION_IMAGE_ID \
       ParameterKey=MigrationImageId,ParameterValue=$MIGRATION_IMAGE_ID \
       ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
