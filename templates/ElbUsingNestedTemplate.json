@@ -77,7 +77,11 @@
                 "HostedZoneName": "klb75.net.",
                 "RecordSets": [
                     {
-                        "Name": "elb.klb75.net.",
+                        "Name": { "Fn::Join": ["", [
+                            "elb.",
+                            {"Ref": "AWS::StackName"},
+                            ".klb75.net."]
+                        ] },
                         "Type": "A",
                         "AliasTarget": {
                             "HostedZoneId": { "Fn::GetAtt": ["Elb", "CanonicalHostedZoneID"] },
