@@ -136,3 +136,7 @@ aws cloudformation create-stack \
       ParameterKey=OneAsgDesiredCapacity,ParameterValue=$ONE_DESIRED_CAPACITY \
       ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
   --stack-name Stack2
+
+
+aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)].StackName'
+aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)||StackName==`Stack2`].StackName'
