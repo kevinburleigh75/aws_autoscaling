@@ -71,6 +71,22 @@
                 ]
             }
         },
+        "ElbDns": {
+            "Type": "AWS::Route53::RecordSetGroup",
+            "Properties": {
+                "HostedZoneName": "klb75.net.",
+                "RecordSets": [
+                    {
+                        "Name": "elb.klb75.net.",
+                        "Type": "A",
+                        "AliasTarget": {
+                            "HostedZoneId": { "Fn::GetAtt": ["Elb", "CanonicalHostedZoneID"] },
+                            "DNSName": { "Fn::GetAtt": ["Elb", "DNSName"] }
+                        }
+                    }
+                ]
+            }
+        },
         "ElbListener": {
             "Type": "AWS::ElasticLoadBalancingV2::Listener",
             "Properties": {
