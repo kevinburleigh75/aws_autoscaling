@@ -137,6 +137,86 @@ aws cloudformation create-stack \
       ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
   --stack-name Stack2
 
+##
+## Migration
+##
+
+export NON_MIGRATION_IMAGE_ID=ami-37884c4d
+export ONE_DESIRED_CAPACITY=3
+export TWO_DESIRED_CAPACITY=1
+
+export MIGRATION_IMAGE_ID=ami-05679357ab362f128
+export MIGRATION_DESIRED_CAPACITY=1
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
+      ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
+      ParameterKey=NonMigrationImageId,ParameterValue=$NON_MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationImageId,ParameterValue=$MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=OneAsgDesiredCapacity,ParameterValue=$ONE_DESIRED_CAPACITY \
+      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
+  --stack-name Stack2
+
+##
+## Code
+##
+
+export NON_MIGRATION_IMAGE_ID=ami-05679357ab362f128
+export ONE_DESIRED_CAPACITY=3
+export TWO_DESIRED_CAPACITY=1
+
+export MIGRATION_IMAGE_ID=ami-05679357ab362f128
+export MIGRATION_DESIRED_CAPACITY=0
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
+      ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
+      ParameterKey=NonMigrationImageId,ParameterValue=$NON_MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationImageId,ParameterValue=$MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=OneAsgDesiredCapacity,ParameterValue=$ONE_DESIRED_CAPACITY \
+      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
+  --stack-name Stack2
+
+##
+## Reset
+##
+
+export NON_MIGRATION_IMAGE_ID=ami-37884c4d
+export ONE_DESIRED_CAPACITY=3
+export TWO_DESIRED_CAPACITY=1
+
+export MIGRATION_IMAGE_ID=ami-37884c4d
+export MIGRATION_DESIRED_CAPACITY=0
+
+aws cloudformation update-stack \
+  --template-url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --parameters \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=BranchNameOrSha,ParameterValue=klb_elb_expers \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
+      ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
+      ParameterKey=NonMigrationImageId,ParameterValue=$NON_MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationImageId,ParameterValue=$MIGRATION_IMAGE_ID \
+      ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=$MIGRATION_DESIRED_CAPACITY \
+      ParameterKey=OneAsgDesiredCapacity,ParameterValue=$ONE_DESIRED_CAPACITY \
+      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
+  --stack-name Stack2
 
 aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)].StackName'
 aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)||StackName==`Stack2`].StackName'
