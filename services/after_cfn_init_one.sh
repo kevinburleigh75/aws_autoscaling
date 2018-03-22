@@ -9,6 +9,9 @@ do
   sleep 1
 done
 
+systemctl enable  kevin_external_server_monitor
+systemctl restart kevin_external_server_monitor
+
 systemctl enable  kevin_ping_server
 systemctl restart kevin_ping_server
 
