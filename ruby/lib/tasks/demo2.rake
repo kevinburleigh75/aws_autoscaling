@@ -260,15 +260,21 @@ module Demo2
       FileUtils.rm_f(filename)
       sleep(1)
       if not File.exist?(filename)
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} sending ping"
+
         pid = Kernel.fork do
           `curl localhost:3000/ping >& /dev/null`
         end
         Process.detach(pid)
         sleep(1)
         if File.exist?(filename)
+          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping caused status file creation"
           is_healthy = true
+        else
+          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping failed to create status file"
         end
       else
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} status file was already created"
         is_healthy = true
       end
 
