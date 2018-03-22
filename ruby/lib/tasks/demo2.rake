@@ -262,10 +262,9 @@ module Demo2
       if not File.exist?(filename)
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} sending ping"
 
-        thr = Thread.new do
-          `curl localhost:3000/ping >& /dev/null`
-        end
-        thr.join
+        `curl localhost:3000/ping >& /dev/null`
+        sleep(1)
+
         if File.exist?(filename)
           Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping caused status file creation"
           is_healthy = true
