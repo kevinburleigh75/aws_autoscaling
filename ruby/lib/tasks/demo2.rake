@@ -238,9 +238,8 @@ module Demo2
       # sleep(0.05)
     end
   end
-end
 
-class MonitorWorker
+  class MonitorWorker
     def initialize(group_uuid:)
       @group_uuid = group_uuid
       @counter    = 0
@@ -293,7 +292,6 @@ class MonitorWorker
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
       # sleep(0.05)
     end
-
   end
 end
 
