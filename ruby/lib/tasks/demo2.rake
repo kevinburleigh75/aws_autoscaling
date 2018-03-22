@@ -262,12 +262,13 @@ module Demo2
       if not File.exist?(filename)
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} sending ping"
 
-        while not File.exist?(filename)
+        pid = Kernel.fork do
           Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} curling"
           stuff = `curl localhost:3000/ping`
           Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{stuff}"
-          sleep(1)
         end
+        Process.detach(pid)
+        sleep(1)
 
         if File.exist?(filename)
           Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping caused status file creation"
