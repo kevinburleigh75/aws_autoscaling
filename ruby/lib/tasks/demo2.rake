@@ -240,6 +240,63 @@ module Demo2
   end
 end
 
+class MonitorWorker
+    def initialize(group_uuid:)
+      @group_uuid = group_uuid
+      @counter    = 0
+    end
+
+    def do_work(count:, modulo:, am_boss:)
+      Rails.logger.level = :info
+
+      @counter += 1
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+
+      start = Time.now
+
+      is_healthy = false
+
+      filename = Rails.root.join('tmp','status.txt').to_s
+
+      FileUtils.rm_f(filename)
+      sleep(1)
+      if not File.exist?(filename)
+        pid = Kernel.fork do
+          `curl localhost:3000/ping >& /dev/null`
+        end
+        Process.detach(pid)
+        sleep(1)
+        if File.exist?(filename)
+          is_healthy = true
+        end
+      else
+        is_healthy = true
+      end
+
+      if not is_healthy
+        puts "   UNHEALTHY"
+        if Rails.env.production?
+          system('/bin/bash /home/ubuntu/primary_repo/services/status_unhealthy.sh')
+        end
+      else
+        puts "   healthy"
+        if Rails.env.production?
+          system('/bin/bash /home/ubuntu/primary_repo/services/status_healthy.sh')
+        end
+      end
+
+      elapsed = Time.now - start
+      Rails.logger.info "   wrote 0 records in #{'%1.3e' % elapsed} sec"
+    end
+
+    def do_boss(count:, modulo:, protocol:)
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+      # sleep(0.05)
+    end
+
+  end
+end
+
 namespace :demo2 do
   desc "Create LearnerResponses and CalcRequests"
   task :request, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
@@ -319,6 +376,37 @@ namespace :demo2 do
     work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
 
     worker = Demo2::ReportWorker.new(
+      group_uuid: group_uuid,
+    )
+
+    protocol = Protocol.new(
+      min_work_interval:  work_interval,
+      min_boss_interval:  boss_interval,
+      work_modulo:        work_modulo,
+      work_offset:        work_offset,
+      group_uuid:         group_uuid,
+      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
+                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
+                  },
+      boss_block: lambda { |instance_count:, instance_modulo:, protocol:|
+                    worker.do_boss(count: instance_count, modulo: instance_modulo, protocol: protocol)
+                  }
+    )
+
+    protocol.run
+  end
+end
+
+namespace :demo2 do
+  desc "Monitor"
+  task :monitor, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
+    group_uuid    = args[:group_uuid]
+    work_interval = (args[:work_interval] || '5.0').to_f.seconds
+    boss_interval = Rails.env.production? ? 30.seconds : 30.seconds
+    work_modulo   = (args[:work_modulo]   || '5.0').to_f.seconds
+    work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
+
+    worker = Demo2::MonitorWorker.new(
       group_uuid: group_uuid,
     )
 

@@ -1,0 +1,15 @@
+[Unit]
+Description=External API Server Monitor
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/bin/bash /home/ubuntu/primary_repo/services/run_external_server_monitor.sh
+Restart=always
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
