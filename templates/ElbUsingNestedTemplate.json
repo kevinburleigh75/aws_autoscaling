@@ -140,14 +140,14 @@
                 "TargetGroupAttributes": [
                     {
                         "Key": "deregistration_delay.timeout_seconds",
-                        "Value": "20"
+                        "Value": "5"
                     }
                 ],
                 "HealthCheckProtocol": "HTTP",
                 "HealthCheckPath": "/ping",
                 "HealthCheckPort": 8000,
-                "HealthCheckIntervalSeconds": 60,
-                "HealthCheckTimeoutSeconds": 10,
+                "HealthCheckIntervalSeconds": 300,
+                "HealthCheckTimeoutSeconds": 60,
                 "HealthyThresholdCount": 2,
                 "UnhealthyThresholdCount": 10,
                 "Matcher": {
