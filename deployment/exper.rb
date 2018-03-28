@@ -173,7 +173,7 @@ def main
     non_migration_image_id: opt_old_image_id,
     migration_asg:          migration_asg,
     migration_image_id:     opt_new_image_id,
-    is_migration:           false,
+    is_migration:           opt_migrate,
   )
 
   ap migration_lc
