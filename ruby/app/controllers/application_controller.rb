@@ -2,7 +2,7 @@ class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
   after_action :touch_healthcheck_file
-  after_action :record_request_handled
+  after_action :record_request
 
   private
 
