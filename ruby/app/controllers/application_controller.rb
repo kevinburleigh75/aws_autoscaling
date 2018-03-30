@@ -1,8 +1,9 @@
 class ApplicationController < ActionController::Base
   protect_from_forgery with: :exception
 
+  around_action :record_request
+
   after_action :touch_healthcheck_file
-  after_action :record_request
 
   private
 
@@ -12,10 +13,19 @@ class ApplicationController < ActionController::Base
   end
 
   def record_request
-    record = RequestRecord.new(
+    start = Time.now
+
+    yield
+
+    elapsed = Time.now - start
+
+    request_record = RequestRecord.new(
       instance_id:        ENV['AWS_INSTANCE_ID'],
       has_been_processed: false,
+      elapsed:            elapsed,
+      fullpath:           request.fullpath,
     )
-    record.save!
+
+    request_record.save!
   end
 end
