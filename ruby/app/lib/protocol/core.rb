@@ -41,9 +41,17 @@ class Protocol
         @world.clear_next_boss_time
       end
 
+      if not @world.has_next_end_time?
+        @world.compute_and_set_next_end_time(current_time: process_time)
+      end
+
       if @world.end_block_should_be_called?(current_time: process_time)
         return false if @world.call_end_block
         @world.compute_and_set_next_end_time(current_time: process_time)
+      end
+
+      if not @world.has_next_work_time?
+        @world.compute_and_set_next_work_time(current_time: process_time)
       end
 
       if @world.work_block_should_be_called?(current_time: process_time)

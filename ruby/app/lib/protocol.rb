@@ -13,7 +13,7 @@ class Protocol
                  reference_time:,
                  timing_modulo:,
                  timing_offset:)
-    @very_long_time = 1000.years
+    @very_long_time = 600.seconds
 
     @min_end_interval  = min_end_interval || @very_long_time
     @end_block         = end_block
@@ -37,7 +37,7 @@ class Protocol
   def run
     begin
       loop do
-        break unless @core.process(process_time: Time.now)
+        break unless @core.process(process_time: Time.now.utc)
       end
     rescue Interrupt => ex
       # puts 'exiting'
@@ -124,8 +124,15 @@ class Protocol
   end
 
   def has_next_boss_time?
-    return true if (@min_boss_interval.nil? || @boss_block.nil?)
     return !@instance_record.next_boss_time.nil?
+  end
+
+  def has_next_end_time?
+    return !@instance_record.next_end_time.nil?
+  end
+
+  def has_next_work_time?
+    return !@instance_record.next_work_time.nil?
   end
 
   def clear_next_boss_time
@@ -206,7 +213,7 @@ class Protocol
   end
 
   def boss_block_should_be_called?(current_time:)
-    return false if @min_boss_interval.nil? || @boss_block.nil? || @instance_record.next_boss_time.nil?
+    return false if @min_boss_interval.nil? || @instance_record.next_boss_time.nil?
     return current_time > @instance_record.next_boss_time
   end
 
@@ -215,7 +222,7 @@ class Protocol
   end
 
   def work_block_should_be_called?(current_time:)
-    return false if @min_work_interval.nil? || @work_block.nil? || @instance_record.next_work_time.nil?
+    return false if @min_work_interval.nil? || @instance_record.next_work_time.nil?
     return current_time > @instance_record.next_work_time
   end
 
@@ -224,7 +231,7 @@ class Protocol
   end
 
   def end_block_should_be_called?(current_time:)
-    return false if @min_end_interval.nil? || @end_block.nil? || @instance_record.next_end_time.nil?
+    return false if @min_end_interval.nil? || @instance_record.next_end_time.nil?
     return current_time > @instance_record.next_end_time
   end
 
