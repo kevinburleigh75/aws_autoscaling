@@ -3,14 +3,7 @@ class ApplicationController < ActionController::Base
 
   around_action :record_request
 
-  after_action :touch_healthcheck_file
-
   private
-
-  def touch_healthcheck_file
-    filename = Rails.root.join('tmp','status.txt').to_s
-    FileUtils.touch(filename)
-  end
 
   def record_request
     start = Time.now
@@ -22,7 +15,7 @@ class ApplicationController < ActionController::Base
     aws_asg_name = %r{^.*?-(?<asg_name>.*?)Stack-}.match(ENV['AWS_ASG_NAME'])['asg_name']
 
     request_record = RequestRecord.new(
-      request_uuid:           SecureRandom.uuid.to_s,
+      request_record_uuid:    SecureRandom.uuid.to_s,
       request_fullpath:       request.fullpath,
       request_elapsed:        elapsed,
       aws_instance_id:        ENV['AWS_INSTANCE_ID'],

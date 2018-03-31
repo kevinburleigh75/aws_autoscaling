@@ -255,42 +255,49 @@ module Demo2
 
       is_healthy = false
 
-      filename = Rails.root.join('tmp','status.txt').to_s
+      request_records = RequestRecord.where(aws_instance_id: ENV['AWS_INSTANCE_ID'])
+                                     .where('created_at > ?', Time.now.utc - 1.second)
+                                     .where('request_elapsed < ?', 0.5)
 
-      FileUtils.rm_f(filename)
-      sleep(1)
-      if not File.exist?(filename)
-        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} sending ping"
-
-        pid = Kernel.fork do
-          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} curling"
-          stuff = `curl localhost:3000/ping`
-          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{stuff}"
-        end
-        Process.detach(pid)
-        sleep(1)
-
-        if File.exist?(filename)
-          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping caused status file creation"
-          is_healthy = true
-        else
-          Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} ping failed to create status file"
-        end
-      else
-        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} status file was already created"
+      if request_records.any?
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} request records exist"
         is_healthy = true
+      else
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} curling"
+
+        curl_successful = false
+        easy = Curl::Easy.new("http://localhost:3000/ping") do |curl|
+          curl.connect_timeout      = 0.5
+          curl.ftp_response_timeout = 0.5
+          curl.on_success do |easy|
+            curl_successful = true
+          end
+        end
+
+        easy.perform
+
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} curl_successful = #{curl_successful}"
+
+        request_records = RequestRecord.where(aws_instance_id: ENV['AWS_INSTANCE_ID'])
+                                       .where('created_at > ?', Time.now.utc - 1.second)
+                                       .where('request_elapsed < ?', 0.5)
+
+        is_healthy = request_records.any?
+
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} num records = #{request_records.count} is_healthy = #{is_healthy}"
       end
 
-      if not is_healthy
+      if is_healthy
+        puts "   healthy"
+        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} healthy"
+        if Rails.env.production?
+          system('/bin/bash /home/ubuntu/primary_repo/services/status_healthy.sh')
+        end
+      else
         puts "   UNHEALTHY"
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} UNHEALTHY"
         if Rails.env.production?
           system('/bin/bash /home/ubuntu/primary_repo/services/status_unhealthy.sh')
-        end
-      else
-        Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} healthy"
-        if Rails.env.production?
-          system('/bin/bash /home/ubuntu/primary_repo/services/status_healthy.sh')
         end
       end
 

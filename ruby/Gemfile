@@ -39,7 +39,11 @@ gem 'chronic'
 ## Bulk insertion
 gem 'activerecord-import'
 
+## For testing - needed everywhere because of rake spec updates
 gem 'rspec-rails', '~> 3.5'
+
+## Basic curl library
+gem 'curb'
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console

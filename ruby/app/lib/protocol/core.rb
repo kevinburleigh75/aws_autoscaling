@@ -13,7 +13,7 @@ class Protocol
         return true
       end
 
-      if not @world.has_boss_record?
+      unless @world.has_boss_record?
         @world.update_boss_vote
         return true
       end
@@ -26,6 +26,8 @@ class Protocol
 
       if @world.allocate_modulo
         return true
+      else
+        @world.save_record
       end
 
       if @world.am_boss?

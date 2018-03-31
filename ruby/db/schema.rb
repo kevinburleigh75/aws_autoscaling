@@ -42,7 +42,7 @@ ActiveRecord::Schema.define(version: 20180329152044) do
   end
 
   create_table "request_records", force: :cascade do |t|
-    t.uuid "request_uuid", null: false
+    t.uuid "request_record_uuid", null: false
     t.string "request_fullpath", null: false
     t.float "request_elapsed", null: false
     t.string "aws_instance_id", null: false
@@ -51,6 +51,7 @@ ActiveRecord::Schema.define(version: 20180329152044) do
     t.boolean "has_been_processed", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["aws_instance_id", "created_at", "request_elapsed"], name: "index_rrs_on_aii_ca_re"
     t.index ["has_been_processed", "created_at"], name: "index_request_records_on_has_been_processed_and_created_at"
   end
 
