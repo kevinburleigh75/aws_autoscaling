@@ -153,7 +153,7 @@ class Protocol
       timing_modulo:   @timing_modulo,
       timing_offset:   @timing_offset,
       instance_count:  @instance_record.instance_count,
-      instance_modulo: @instance_record.instance_modulo,
+      instance_modulo: 0, ## boss time is independent of instance modulo
       interval:        @min_boss_interval
     )
 
@@ -265,6 +265,7 @@ class Protocol
 
   def sleep_until_next_event
     delay = [@instance_record.next_wake_time - Time.now, 0.001].max
+    # puts "delay = #{delay}"
     sleep(delay)
   end
 

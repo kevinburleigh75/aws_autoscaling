@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20171031115929) do
+ActiveRecord::Schema.define(version: 20180329152044) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -39,6 +39,19 @@ ActiveRecord::Schema.define(version: 20171031115929) do
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
     t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
+  end
+
+  create_table "request_records", force: :cascade do |t|
+    t.uuid "request_uuid", null: false
+    t.string "request_fullpath", null: false
+    t.float "request_elapsed", null: false
+    t.string "aws_instance_id", null: false
+    t.string "aws_asg_name", null: false
+    t.string "aws_lc_image_id", null: false
+    t.boolean "has_been_processed", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["has_been_processed", "created_at"], name: "index_request_records_on_has_been_processed_and_created_at"
   end
 
 end
