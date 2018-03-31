@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
 ## needed for curb gem
-sudo agt-get update
+sudo apt-get update
 sudo apt-get -y install libcurl4-openssl-dev
 
 sudo -H -i -u ubuntu bash -c "aws configure set s3.signature_version s3v4"
