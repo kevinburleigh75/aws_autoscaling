@@ -13,13 +13,15 @@ class Protocol
                  reference_time:,
                  timing_modulo:,
                  timing_offset:)
-    @min_end_interval  = min_end_interval
+    @very_long_time = 1000.years
+
+    @min_end_interval  = min_end_interval || @very_long_time
     @end_block         = end_block
-    @min_boss_interval = min_boss_interval
+    @min_boss_interval = min_boss_interval || @very_long_time
     @boss_block        = boss_block
-    @min_work_interval = min_work_interval
+    @min_work_interval = min_work_interval || @very_long_time
     @work_block        = work_block
-    @min_wake_interval = min_wake_interval || 0.25.seconds
+    @min_wake_interval = min_wake_interval || [0.25.seconds, dead_record_timeout / 3.0].min
 
     @group_uuid          = group_uuid
     @instance_uuid       = instance_uuid
@@ -209,7 +211,7 @@ class Protocol
   end
 
   def call_boss_block
-    @boss_block.call(protocol: self)
+    @boss_block.call(protocol: self) unless @boss_block.nil?
   end
 
   def work_block_should_be_called?(current_time:)
@@ -218,7 +220,7 @@ class Protocol
   end
 
   def call_work_block
-    @work_block.call(protocol: self)
+    @work_block.call(protocol: self) unless @work_block.nil?
   end
 
   def end_block_should_be_called?(current_time:)
@@ -227,7 +229,7 @@ class Protocol
   end
 
   def call_end_block
-    @end_block.call(protocol: self)
+    @end_block.call(protocol: self) unless @end_block.nil?
   end
 
   def save_record
