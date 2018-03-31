@@ -26,8 +26,6 @@ class Protocol
 
       if @world.allocate_modulo
         return true
-      else
-        @world.save_record
       end
 
       if @world.am_boss?
