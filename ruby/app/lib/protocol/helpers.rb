@@ -84,10 +84,10 @@
               instance_modulo:     modulo,
               instance_desc:       instance_desc,
               boss_uuid:           instance_uuid,
-              next_end_time:       Time.now.utc,
-              next_boss_time:      Time.now.utc,
-              next_work_time:      Time.now.utc,
-              next_wake_time:      Time.now.utc,
+              next_end_time:       nil,
+              next_boss_time:      nil,
+              next_work_time:      nil,
+              next_wake_time:      nil,
             )
           end
 
