@@ -170,7 +170,7 @@ def main
     stack_name:             opt_stack_name,
     template_url:           opt_template_url,
     non_migration_asgs:     non_migration_asgs,
-    non_migration_image_id: opt_old_image_id,
+    non_migration_image_id: opt_migrate ? opt_old_image_id : opt_new_image_id,
     migration_asg:          migration_asg,
     migration_image_id:     opt_new_image_id,
     is_migration:           opt_migrate,
