@@ -307,7 +307,26 @@ module Demo2
 
     def do_boss(count:, modulo:, protocol:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
-      # sleep(0.05)
+
+      # ## get DesiredCapacity (number of instances) of ASG
+      # num_instances = 3
+
+      # ## get number of ELB connections per sec in the last minute
+      # num_client_requests_per_sec =
+
+      # asg_capacity_requests_per_sec_per_instance = 10.0
+      # asg_current_capacity_requests_per_sec = asg_capacity_requests_per_sec_per_instance * num_instances
+
+      # ## get number of requests processed by ASG in last 10 seconds
+      # asg_num_handled_requests = RequestRecord.where(aws_asg_name: ENV['AWS_ASG_NAME'])
+      #                                         .where('created_at > ?', Time.now.utc - 10.seconds)
+      #                                         .count
+
+      # asg_used_capacity_requests_per_sec = asg_num_handled_requests / 10.0
+
+      # # sleep(0.05)
+      elapsed = Time.now - start
+      Rails.logger.info "   wrote 0 records in #{'%1.3e' % elapsed} sec"
     end
   end
 end

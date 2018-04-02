@@ -83,6 +83,7 @@
               instance_count:      1,
               instance_modulo:     modulo,
               instance_desc:       instance_desc,
+              asg_short_name:      ENV['AWS_ASG_SHORT_NAME'],
               boss_uuid:           instance_uuid,
               next_end_time:       nil,
               next_boss_time:      nil,

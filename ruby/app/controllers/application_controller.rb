@@ -12,14 +12,12 @@ class ApplicationController < ActionController::Base
 
     elapsed = Time.now - start
 
-    aws_asg_name = %r{^.*?-(?<asg_name>.*?)Stack-}.match(ENV['AWS_ASG_NAME'])['asg_name']
-
     request_record = RequestRecord.new(
       request_record_uuid:    SecureRandom.uuid.to_s,
       request_fullpath:       request.fullpath,
       request_elapsed:        elapsed,
       aws_instance_id:        ENV['AWS_INSTANCE_ID'],
-      aws_asg_name:           aws_asg_name,
+      aws_asg_name:           ENV['AWS_ASG_NAME'],
       aws_lc_image_id:        ENV['AWS_ASG_LC_IMAGE_ID'],
       has_been_processed:     false,
     )

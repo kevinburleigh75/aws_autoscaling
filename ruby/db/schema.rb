@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180329152044) do
+ActiveRecord::Schema.define(version: 20180402041358) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -36,6 +36,7 @@ ActiveRecord::Schema.define(version: 20180329152044) do
     t.datetime "next_wake_time"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "asg_short_name"
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
     t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
