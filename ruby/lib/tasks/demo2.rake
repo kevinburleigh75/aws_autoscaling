@@ -308,10 +308,11 @@ module Demo2
     def do_boss(count:, modulo:, protocol:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
 
-      ## get requests processed by ASG in last 10 seconds
-      # asg_num_handled_requests = RequestRecord.where(aws_asg_name: ENV['AWS_ASG_NAME'])
-      #                                         .where('created_at > ?', Time.now.utc - 10.seconds)
-      #                                         .count
+      asg_num_handled_requests = RequestRecord.where(aws_asg_name: ENV['AWS_ASG_NAME'])
+                                              .where('created_at > ?', Time.now.utc - 10.seconds)
+                                              .count
+
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   ASG handled requests = #{asg_num_handled_requests}"
 
       client = Aws::AutoScaling::Client.new
 
