@@ -452,7 +452,7 @@ namespace :demo2 do
   task :monitor, [:group_uuid, :work_interval, :timing_modulo, :timing_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
     work_interval = (args[:work_interval] || '5.0').to_f.seconds
-    boss_interval = Rails.env.production? ? 30.seconds : 30.seconds
+    boss_interval = Rails.env.production? ? 10.seconds : 10.seconds
     timing_modulo = (args[:timing_modulo]   || '5.0').to_f.seconds
     timing_offset = (args[:timing_offset]   || '0.0').to_f.seconds
 
