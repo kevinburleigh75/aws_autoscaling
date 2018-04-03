@@ -267,14 +267,17 @@ module Demo2
 
         curl_successful = false
         easy = Curl::Easy.new("http://localhost:3000/ping") do |curl|
-          curl.connect_timeout_ms   = 500
-          curl.timeout_ms           = 500
+          curl.connect_timeout_ms   = 1000
+          curl.timeout_ms           = 1000
           curl.on_success do |easy|
             curl_successful = true
           end
         end
 
-        easy.perform
+        begin
+          easy.perform
+        rescue
+        end
 
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} curl_successful = #{curl_successful}"
 
