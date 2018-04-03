@@ -312,26 +312,26 @@ module Demo2
                                               .where('created_at > ?', Time.now.utc - 10.seconds)
                                               .count
 
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   ASG handled requests = #{asg_num_handled_requests}"
-
       client = Aws::AutoScaling::Client.new
 
       asg = client.describe_auto_scaling_groups(
         auto_scaling_group_names: [ ENV['AWS_ASG_NAME'] ]
       ).auto_scaling_groups[0]
 
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   ASG desired capacity = #{asg.desired_capacity}"
+      asg_requests_per_sec_per_instance     = 10.0
+      asg_reserve_requests_per_sec          = 20.0
+      asg_demand_requests_per_sec           = asg_num_handled_requests / 10.0
+      asg_current_capacity_requests_per_sec = asg.desired_capacity * asg_requests_per_sec_per_instance
+      asg_desired_instances                 = ((asg_demand_requests_per_sec + asg_reserve_requests_per_sec)/asg_requests_per_sec_per_instance).ceil
 
+      Rails.logger.info "ASG -------------------------------------------------"
+      Rails.logger.info "ASG asg_requests_per_sec_per_instance     = #{asg_requests_per_sec_per_instance}"
+      Rails.logger.info "ASG asg_reserve_requests_per_sec          = #{asg_reserve_requests_per_sec}"
+      Rails.logger.info "ASG asg_demand_requests_per_sec           = #{asg_demand_requests_per_sec}"
+      Rails.logger.info "ASG asg_current_capacity_requests_per_sec = #{asg_current_capacity_requests_per_sec}"
+      Rails.logger.info "ASG asg_desired_instances                 = #{asg_desired_instances}"
+      Rails.logger.info "ASG current desired_capacity              = #{asg.desired_capacity}"
 
-      # ## get number of ELB connections per sec in the last minute
-      # num_client_requests_per_sec =
-
-      # asg_capacity_requests_per_sec_per_instance = 10.0
-      # asg_current_capacity_requests_per_sec = asg_capacity_requests_per_sec_per_instance * num_instances
-
-      # asg_used_capacity_requests_per_sec = asg_num_handled_requests / 10.0
-
-      # # sleep(0.05)
       elapsed = Time.now - start
       Rails.logger.info "   wrote 0 records in #{'%1.3e' % elapsed} sec"
     end
