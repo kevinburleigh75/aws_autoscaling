@@ -127,6 +127,41 @@ def update_stack(stack_name:,
   )
 end
 
+def adjust_freeze(stack_name:,
+                  asgs:,
+                  is_freeze:)
+  client = Aws::AutoScaling::Client.new
+
+  if is_freeze
+    asgs.each do |asg|
+      client.create_or_update_tags({
+        tags: [
+          {
+            key: 'FreezeAutoscalingEvents',
+            propagate_at_launch: false,
+            resource_id: asg.auto_scaling_group_name,
+            resource_type: 'auto-scaling-group',
+          }
+        ]
+      })
+    end
+  else
+    asgs.each do |asg|
+      client.delete_tags({
+        tags: [
+          {
+            key: 'FreezeAutoscalingEvents',
+            resource_id: asg.auto_scaling_group_name,
+            resource_type: 'auto-scaling-group',
+          }
+        ]
+      })
+    end
+  end
+
+  ap asgs.last
+end
+
 def main
   opts = Slop.parse do |slop|
     slop.on '--help', 'show this help' do
@@ -137,8 +172,10 @@ def main
     slop.string '--template_url', 'template S3 URL', required: true
     slop.string '--old_image_id', 'old AMI ID (just to be safe)', required: true
     slop.string '--new_image_id', 'new AMI ID', required: true
-    slop.bool   '--migrate', 'deploy only to migration ASG (cannot be used with --deploy)'
-    slop.bool   '--deploy', 'deploy only to non-migration ASGs (cannot be used with --migrate)'
+    slop.bool   '--migrate', 'deploy only to migration ASG (cannot be used with --deploy, --freeze, --unfreeze)'
+    slop.bool   '--deploy', 'deploy only to non-migration ASGs (cannot be used with --migrate, --freeze, --unfreeze)'
+    slop.bool   '--freeze', 'freeze autoscaling events (cannot be used with --deploy, --migrate, --unfreeze)'
+    slop.bool   '--unfreeze', 'unfreeze autoscaling events (cannot be used with --deploy, --migrate, --freeze)'
   end
   opt_stack_name   = opts[:stack_name]
   opt_template_url = opts[:template_url]
@@ -146,9 +183,11 @@ def main
   opt_new_image_id = opts[:new_image_id]
   opt_migrate      = opts[:migrate]
   opt_deploy       = opts[:deploy]
+  opt_freeze       = opts[:freeze]
+  opt_unfreeze       = opts[:unfreeze]
 
-  unless opt_migrate ^ opt_deploy
-    abort('exactly one of --migrate or --deploy must be specified')
+  unless opt_migrate ^ opt_deploy ^ opt_freeze ^ opt_unfreeze
+    abort('exactly one of --migrate, --deploy, --freeze, --unfreeze must be specified')
   end
 
   stacks        = get_nested_stacks(parent_stack_name: opt_stack_name)
@@ -166,21 +205,23 @@ def main
   migration_lc      = get_asg_lcs(asgs: [migration_asg])[0]
   non_migration_lcs = get_asg_lcs(asgs: non_migration_asgs)
 
-  update_stack(
-    stack_name:             opt_stack_name,
-    template_url:           opt_template_url,
-    non_migration_asgs:     non_migration_asgs,
-    non_migration_image_id: opt_migrate ? opt_old_image_id : opt_new_image_id,
-    migration_asg:          migration_asg,
-    migration_image_id:     opt_new_image_id,
-    is_migration:           opt_migrate,
-  )
-
-  ap migration_lc
-  ap non_migration_lcs
-
-  ap migration_asg
-  ap non_migration_asgs
+  if opt_migrate || opt_deploy
+    update_stack(
+      stack_name:             opt_stack_name,
+      template_url:           opt_template_url,
+      non_migration_asgs:     non_migration_asgs,
+      non_migration_image_id: opt_migrate ? opt_old_image_id : opt_new_image_id,
+      migration_asg:          migration_asg,
+      migration_image_id:     opt_new_image_id,
+      is_migration:           opt_migrate,
+    )
+  else
+    adjust_freeze(
+      stack_name: opt_stack_name,
+      asgs:       asgs,
+      is_freeze:  opt_freeze,
+    )
+  end
 end
 
 main
