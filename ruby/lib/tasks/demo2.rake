@@ -313,12 +313,14 @@ module Demo2
       #                                         .where('created_at > ?', Time.now.utc - 10.seconds)
       #                                         .count
 
-      # client = Aws::AutoScaling::Client.new
-      # asg = client.describe_auto_scaling_groups(
-      #   auto_scaling_group_names: [ ENV['AWS_ASG_NAME'] ]
-      # ).auto_scaling_groups[0]
+      client = Aws::AutoScaling::Client.new
 
-      # num_instances = asg.
+      asg = client.describe_auto_scaling_groups(
+        auto_scaling_group_names: [ ENV['AWS_ASG_NAME'] ]
+      ).auto_scaling_groups[0]
+
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   ASG desired capacity = #{asg.desired_capacity}"
+
 
       # ## get number of ELB connections per sec in the last minute
       # num_client_requests_per_sec =
