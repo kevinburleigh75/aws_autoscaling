@@ -4,6 +4,9 @@
 
 cd /home/ubuntu/primary_repo/ruby
 
+echo "installing bundler..."
+gem install bundler
+
 echo "running bundle install..."
 RAILS_ENV=production bundle install
 
