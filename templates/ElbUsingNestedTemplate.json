@@ -146,7 +146,7 @@
                 "HealthCheckProtocol": "HTTP",
                 "HealthCheckPath": "/ping",
                 "HealthCheckPort": 8000,
-                "HealthCheckIntervalSeconds": 20,
+                "HealthCheckIntervalSeconds": 60,
                 "HealthCheckTimeoutSeconds": 5,
                 "HealthyThresholdCount": 2,
                 "UnhealthyThresholdCount": 10,
