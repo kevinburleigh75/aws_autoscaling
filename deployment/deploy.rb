@@ -169,9 +169,9 @@ def main
       exit
     end
     slop.string '--stack_name', 'name of stack to modify', required: true
-    slop.string '--template_url', 'template S3 URL', required: true
-    slop.string '--old_image_id', 'old AMI ID (just to be safe)', required: true
-    slop.string '--new_image_id', 'new AMI ID', required: true
+    slop.string '--template_url', 'template S3 URL'
+    slop.string '--old_image_id', 'old AMI ID (just to be safe)'
+    slop.string '--new_image_id', 'new AMI ID'
     slop.bool   '--migrate', 'deploy only to migration ASG (cannot be used with --deploy, --freeze, --unfreeze)'
     slop.bool   '--deploy', 'deploy only to non-migration ASGs (cannot be used with --migrate, --freeze, --unfreeze)'
     slop.bool   '--freeze', 'freeze autoscaling events (cannot be used with --deploy, --migrate, --unfreeze)'
@@ -188,6 +188,10 @@ def main
 
   unless opt_migrate ^ opt_deploy ^ opt_freeze ^ opt_unfreeze
     abort('exactly one of --migrate, --deploy, --freeze, --unfreeze must be specified')
+  end
+
+  unless (opt_freeze || opt_unfreeze) || ( (opt_migrate || opt_deploy) && opt_template_url && opt_old_image_id && opt_new_image_id)
+    abort('must specify --template_url, --old_image_id, and --new_image_id unless --freeze, --unfreeze')
   end
 
   stacks        = get_nested_stacks(parent_stack_name: opt_stack_name)
