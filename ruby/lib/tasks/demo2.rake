@@ -338,11 +338,11 @@ module Demo2
       Rails.logger.info "ASG current desired_capacity              = #{asg.desired_capacity}"
 
       unless asg.tags.detect{|tag| tag.key == 'FreezeAutoscalingEvents'}
-        if asg.desired_capacity != asg_desired_instances
+        if asg.desired_capacity < asg_desired_instances
           AutoscalingRequest.create!(
             uuid:             SecureRandom.uuid.to_s,
             group_uuid:       @group_uuid,
-            request_type:     (asg_desired_instances > asg.desired_capacity) ? 'increase' : 'decrease',
+            request_type:     'increase',
             desired_capacity: asg_desired_instances,
           )
 
@@ -351,6 +351,26 @@ module Demo2
             desired_capacity:        asg_desired_instances,
             honor_cooldown:          false,
           })
+        elsif asg.desired_capacity > asg_desired_instances
+          num_recent_increases = AutoscalingRequest.where(group_uuid: @group_uuid)
+                                                   .where('created_at > ?', Time.now.utc - 5.minutes)
+                                                   .where(request_type: 'increase')
+                                                   .count
+
+          if num_recent_increases == 0
+            AutoscalingRequest.create!(
+              uuid:             SecureRandom.uuid.to_s,
+              group_uuid:       @group_uuid,
+              request_type:     'decrease',
+              desired_capacity: asg_desired_instances,
+            )
+
+            client.set_desired_capacity({
+              auto_scaling_group_name: ENV['AWS_ASG_NAME'],
+              desired_capacity:        asg_desired_instances,
+              honor_cooldown:          false,
+            })
+          end
         end
       end
 
