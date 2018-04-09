@@ -340,9 +340,10 @@ module Demo2
       unless asg.tags.detect{|tag| tag.key == 'FreezeAutoscalingEvents'}
         if asg.desired_capacity != asg_desired_instances
           AutoscalingRequest.create!(
-            uuid:         SecureRandom.uuid.to_s,
-            group_uuid:   @group_uuid,
-            request_type: (asg_desired_instances > asg.desired_capacity) ? 'increase' : 'decrease',
+            uuid:             SecureRandom.uuid.to_s,
+            group_uuid:       @group_uuid,
+            request_type:     (asg_desired_instances > asg.desired_capacity) ? 'increase' : 'decrease',
+            desired_capacity: asg_desired_instances,
           )
 
           client.set_desired_capacity({
