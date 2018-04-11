@@ -292,12 +292,26 @@ module Demo2
 
       if is_healthy
         puts "   healthy"
+
+        HealthCheckEvent.create!(
+          health_check_uuid: SecureRandom.uuid.to_s,
+          instance_id:       ENV['AWS_INSTANCE_ID'],
+          health_status:     'healthy',
+        )
+
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} healthy"
         if Rails.env.production?
           system('/bin/bash /home/ubuntu/primary_repo/services/status_healthy.sh')
         end
       else
         puts "   UNHEALTHY"
+
+        HealthCheckEvent.create!(
+          health_check_uuid: SecureRandom.uuid.to_s,
+          instance_id:       ENV['AWS_INSTANCE_ID'],
+          health_status:     'unhealthy',
+        )
+
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} UNHEALTHY"
         if Rails.env.production?
           system('/bin/bash /home/ubuntu/primary_repo/services/status_unhealthy.sh')

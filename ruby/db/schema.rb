@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180409143729) do
+ActiveRecord::Schema.define(version: 20180411174713) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -22,6 +22,18 @@ ActiveRecord::Schema.define(version: 20180409143729) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "desired_capacity", null: false
+  end
+
+  create_table "health_check_events", force: :cascade do |t|
+    t.uuid "health_check_uuid", null: false
+    t.string "instance_id", null: false
+    t.string "health_status", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["created_at"], name: "index_health_check_events_on_created_at"
+    t.index ["health_check_uuid"], name: "index_health_check_events_on_health_check_uuid", unique: true
+    t.index ["health_status"], name: "index_health_check_events_on_health_status"
+    t.index ["instance_id"], name: "index_health_check_events_on_instance_id"
   end
 
   create_table "protocol_records", force: :cascade do |t|
