@@ -300,9 +300,13 @@ module Demo2
         )
 
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} healthy"
-        if Rails.env.production?
-          system('/bin/bash /home/ubuntu/primary_repo/services/status_healthy.sh')
-        end
+
+        client = Aws::AutoScaling::Client.new
+
+        client.set_instance_health(
+          instance_id: ENV['AWS_INSTANCE_ID'],
+          health_status: 'Healthy',
+        )
       else
         puts "   UNHEALTHY"
 
@@ -313,9 +317,10 @@ module Demo2
         )
 
         Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} UNHEALTHY"
-        if Rails.env.production?
-          system('/bin/bash /home/ubuntu/primary_repo/services/status_unhealthy.sh')
-        end
+        client.set_instance_health(
+          instance_id: ENV['AWS_INSTANCE_ID'],
+          health_status: 'Unhealthy',
+        )
       end
 
       elapsed = Time.now - start
