@@ -50,8 +50,18 @@ gem 'curb'
 gem 'aws-sdk'
 
 
+#########################
+##  These gems are for deployment tools,
+##  and aren't necessarily needed by the
+##  rails app.
+
 ## gives the ap function to pretty print structures
 gem 'awesome_print'
+
+## Simple Lightweight Option Parsing
+gem 'slop'
+##
+##########################
 
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
