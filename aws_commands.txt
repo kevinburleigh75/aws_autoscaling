@@ -218,5 +218,69 @@ aws cloudformation update-stack \
       ParameterKey=TwoAsgDesiredCapacity,ParameterValue=$TWO_DESIRED_CAPACITY \
   --stack-name Stack2
 
+ssh -i .ssh/kevin_va_kp.pem -t ubuntu@35.174.168.245 ls
+ssh -i ~/.ssh/kevin_va_kp.pem -o StrictHostKeyChecking=no -t ubuntu@34.239.94.100 ls
+
 aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)].StackName'
 aws cloudformation describe-stacks --query 'Stacks[?starts_with(StackName,`Stack2-`)||StackName==`Stack2`].StackName'
+
+aws elbv2 describe-target-health --target-group-arn arn:aws:elasticloadbalancing:us-east-1:714205614004:targetgroup/Stack-ElbGr-FVOPYT0Y3HLQ/ca95bca2bf2254d8 --query 'TargetHealthDescriptions[*].[TargetHealth.State,Target.Id]' --output text
+
+aws cloudwatch get-metric-statistics --metric-name ActiveConnectionCount --namespace AWS/ApplicationELB --statistics Sum --start-time 2018-03-25T07:00:00Z --end-time 2018-03-25T07:01:00Z --period 60 --dimensions Name=LoadBalancer,Value=app/Stack2-Elb-1MGQOY3G46BGY/254beeb1cf610ba5
+{
+    "Label": "ActiveConnectionCount",
+    "Datapoints": [
+        {
+            "Unit": "Count",
+            "Sum": 12.0,
+            "Timestamp": "2018-03-25T07:00:00Z"
+        }
+    ]
+}
+
+./deploy.rb --stack_name Stack2 --template_url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json --old_image_id ami-37884c4d --new_image_id ami-05679357ab362f128 --deploy
+
+aws cloudwatch get-metric-statistics --metric-name RequestCount --namespace AWS/ApplicationELB --statistics Sum --start-time 2018-03-25T07:00:00Z --end-time 2018-03-25T07:05:00Z --period 60 --dimensions Name=LoadBalancer,Value=app/Stack2-Elb-1MGQOY3G46BGY/254beeb1cf610ba5
+aws cloudwatch get-metric-statistics --metric-name RequestCountPerTarget --namespace AWS/ApplicationELB --statistics Sum --start-time 2018-03-25T07:00:00Z --end-time 2018-03-25T07:05:00Z --period 60 --dimensions Name=LoadBalancer,Value=app/Stack2-Elb-1MGQOY3G46BGY/254beeb1cf610ba5 Name=TargetGroup,Value=targetgroup/Stack-ElbGr-FVOPYT0Y3HLQ/ca95bca2bf2254d8
+aws cloudwatch list-metrics --namespace "AWS/ApplicationELB" --metric-name "RequestCountPerTarget" --dimensions Name="LoadBalancer",Value="app/Stack2-Elb-WQO3Q95O87B1/4bf9b16e72c05d61"
+aws cloudwatch get-metric-statistics --namespace "AWS/ApplicationELB" --metric-name "RequestCount" --dimensions Name="LoadBalancer",Value="app/Stack2-Elb-WQO3Q95O87B1/4bf9b16e72c05d61" --start-time 2018-03-29T14:50:00Z  --end-time 2018-03-29T14:59:00Z --period 60 --statistics Sum
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --freeze
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --template_url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --old_image_id ami-37884c4d \
+  --new_image_id ami-05679357ab362f128 \
+  --migrate
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --template_url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --old_image_id ami-05679357ab362f128 \
+  --new_image_id ami-37884c4d \
+  --migrate
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --template_url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --old_image_id ami-37884c4d \
+  --new_image_id ami-05679357ab362f128 \
+  --deploy
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --template_url https://s3.amazonaws.com/kevin-templates/ElbUsingNestedTemplate.json \
+  --old_image_id ami-05679357ab362f128 \
+  --new_image_id ami-37884c4d \
+  --deploy
+
+./deploy.rb \
+  --stack_name Stack2 \
+  --unfreeze
+
+
+
+

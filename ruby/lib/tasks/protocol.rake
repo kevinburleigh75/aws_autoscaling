@@ -1,73 +1,60 @@
-class Worker
-  def initialize(group_uuid:)
-    @group_uuid     = group_uuid
-    @counter        = 0
-  end
+module ProtocolTest
+  class Worker
+    def initialize(group_uuid:)
+      @group_uuid     = group_uuid
+      @counter        = 0
+    end
 
-  def do_work(count:, modulo:, am_boss:)
-    @counter += 1
-    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+    def do_work(count:, modulo:, am_boss:)
+      @counter += 1
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+    end
 
-    start = Time.now
+    def do_boss(count:, modulo:, protocol:)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    end
 
-    num_records = 100
-    # uuids = num_records.times.map{ SecureRandom.uuid.to_s }
-    # ActiveRecord::Base.connection_pool.with_connection do
-      # ExperRecord.transaction(isolation: :serializable) do
-      ExperRecord.transaction(isolation: :repeatable_read) do
-        num_records.times.map do
-          ExperRecord.create!(
-            uuid:  SecureRandom.uuid,
-            uuid1: SecureRandom.uuid,
-            uuid2: SecureRandom.uuid,
-            uuid3: SecureRandom.uuid,
-            uuid4: SecureRandom.uuid,
-            uuid5: SecureRandom.uuid,
-            uuid6: SecureRandom.uuid,
-            uuid7: SecureRandom.uuid,
-            uuid8: SecureRandom.uuid,
-            uuid9: SecureRandom.uuid,
-          )
-        end
-        # uuids.map{|uuid| ExperRecord.create!(uuid: uuid)}
-        # exper_records.map(&:save!)
-      end
-    # end
-
-    elapsed = Time.now - start
-    Rails.logger.info "   wrote #{num_records} records in #{'%1.3e' % elapsed} sec"
-  end
-
-  def do_boss(count:, modulo:)
-    Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
-    # sleep(0.05)
+    def do_end(count:, modulo:, am_boss:)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   end block..."
+      return false
+    end
   end
 end
 
 namespace :protocol do
-  desc "Join the 'exper' protocol group"
-  task :exper, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
+  desc "protcol test"
+  task :test, [:group_uuid, :work_interval, :boss_interval, :end_interval, :timing_modulo, :timing_offset] => :environment do |t, args|
     group_uuid    = args[:group_uuid]
-    work_interval = (args[:work_interval] || '1.0').to_f.seconds
-    boss_interval = 5.seconds
-    work_modulo   = (args[:work_modulo]   || '1.0').to_f.seconds
-    work_offset   = (args[:work_offset]   || '0.0').to_f.seconds
+    work_interval = args[:work_interval].nil? ? nil : args[:work_interval].to_f.seconds
+    boss_interval = args[:boss_interval].nil? ? nil : args[:boss_interval].to_f.seconds
+    end_interval  = args[:end_interval].nil?  ? nil : args[:end_interval].to_f.seconds
+    timing_modulo = (args[:timing_modulo] || '5.0').to_f.seconds
+    timing_offset = (args[:timing_offset] || '0.0').to_f.seconds
 
-    worker = Worker.new(group_uuid: group_uuid)
+    worker = ProtocolTest::Worker.new(
+      group_uuid: group_uuid,
+    )
 
     protocol = Protocol.new(
-      protocol_name: 'exper',
-      min_work_interval: work_interval,
-      min_boss_interval: boss_interval,
-      work_modulo: work_modulo,
-      work_offset: work_offset,
-      group_uuid: group_uuid,
-      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
-                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
-                  },
-      boss_block: lambda { |instance_count:, instance_modulo:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo)
-                  }
+      min_work_interval:    work_interval,
+      work_block:           lambda { |protocol:|
+                              worker.do_work(count: protocol.count, modulo: protocol.modulo, am_boss: protocol.am_boss?)
+                            },
+      min_boss_interval:    boss_interval,
+      boss_block:           lambda { |protocol:|
+                              worker.do_boss(count: protocol.count, modulo: protocol.modulo, protocol: protocol)
+                            },
+      min_end_interval:     end_interval,
+      end_block:            lambda { |protocol:|
+                              worker.do_end(count: protocol.count, modulo: protocol.modulo, am_boss: protocol.am_boss?)
+                            },
+      group_uuid:           group_uuid,
+      instance_uuid:        SecureRandom.uuid.to_s,
+      instance_desc:        ENV['AWS_INSTANCE_ID'],
+      dead_record_timeout:  5.seconds,
+      reference_time:       Chronic.parse('Jan 1, 2000 12:00:00pm'),
+      timing_modulo:        timing_modulo,
+      timing_offset:        timing_offset,
     )
 
     protocol.run
