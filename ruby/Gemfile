@@ -49,6 +49,10 @@ gem 'curb'
 ## (eventually we might want to include only the parts we need)
 gem 'aws-sdk'
 
+
+## gives the ap function to pretty print structures
+gem 'awesome_print'
+
 group :development, :test do
   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
   gem 'byebug', platforms: [:mri, :mingw, :x64_mingw]

@@ -43,6 +43,7 @@ GEM
     addressable (2.5.1)
       public_suffix (~> 2.0, >= 2.0.2)
     arel (8.0.0)
+    awesome_print (1.8.0)
     aws-partitions (1.76.0)
     aws-sdk (3.0.1)
       aws-sdk-resources (~> 3)
@@ -743,6 +744,7 @@ PLATFORMS
 
 DEPENDENCIES
   activerecord-import
+  awesome_print
   aws-sdk
   byebug
   capybara (~> 2.13)
