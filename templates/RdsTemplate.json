@@ -1,56 +1,10 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
-    "Metadata": {
-        "AWS::CloudFormation::Designer": {
-            "ce42e672-9edc-4b7a-bdd5-8dae1ee60a66": {
-                "size": {
-                    "width": 60,
-                    "height": 60
-                },
-                "position": {
-                    "x": 260,
-                    "y": 120
-                },
-                "z": 0,
-                "embeds": []
-            }
-        }
-    },
-    "Resources": {
-        "AsgDb": {
-            "Type": "AWS::RDS::DBInstance",
-            "Properties": {
-                "AllocatedStorage": 100,
-                "DBInstanceClass": "db.t2.medium",
-                "Engine": "postgres",
-                "VPCSecurityGroups": [
-                    "sg-9f7085ec"
-                ],
-                "DBInstanceIdentifier": {
-                    "Ref": "DbInstanceIdentifier"
-                },
-                "MasterUsername": {
-                    "Ref": "MasterUsername"
-                },
-                "MasterUserPassword": {
-                    "Ref": "MasterPassword"
-                },
-                "StorageType": "gp2",
-                "DBName": {
-                    "Ref": "DbName"
-                },
-                "Port": {
-                    "Ref": "DbPort"
-                }
-            },
-            "Metadata": {
-                "AWS::CloudFormation::Designer": {
-                    "id": "ce42e672-9edc-4b7a-bdd5-8dae1ee60a66"
-                }
-            }
-        }
-    },
     "Parameters": {
+        "VpcStackName": {
+            "Description": "name of the VPC stack this db should be placed in",
+            "Type": "String"
+        },
         "DbInstanceIdentifier": {
             "Description": "name of the db instance",
             "Type": "String",
@@ -77,6 +31,38 @@
             "NoEcho": "true"
         }
     },
+    "Resources": {
+        "AsgDb": {
+            "Type": "AWS::RDS::DBInstance",
+            "Properties": {
+                "AllocatedStorage": 100,
+                "DBInstanceClass": "db.t2.medium",
+                "Engine": "postgres",
+                "DBSubnetGroupName": {
+                    "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetGroupId" }
+                },
+                "VPCSecurityGroups": [
+                    { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } }
+                ],
+                "DBInstanceIdentifier": {
+                    "Ref": "DbInstanceIdentifier"
+                },
+                "MasterUsername": {
+                    "Ref": "MasterUsername"
+                },
+                "MasterUserPassword": {
+                    "Ref": "MasterPassword"
+                },
+                "StorageType": "gp2",
+                "DBName": {
+                    "Ref": "DbName"
+                },
+                "Port": {
+                    "Ref": "DbPort"
+                }
+            }
+        }
+    },
     "Outputs": {
         "Endpoint": {
             "Description": "URL of the database host",
@@ -87,9 +73,7 @@
                 ]
             },
             "Export": {
-                "Name": {
-                    "Fn::Sub": "${AWS::StackName}-Endpoint"
-                }
+                "Name": { "Fn::Sub": "${AWS::StackName}-Endpoint" }
             }
         },
         "DbPort": {
@@ -101,9 +85,7 @@
                 ]
             },
             "Export": {
-                "Name": {
-                    "Fn::Sub": "${AWS::StackName}-DbPort"
-                }
+                "Name": { "Fn::Sub": "${AWS::StackName}-DbPort" }
             }
         }
     }

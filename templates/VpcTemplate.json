@@ -229,7 +229,7 @@
                         "CidrIpv6": "::/0"
                     }
                 ],
-                "VpcId": "vpc-b087e6d4",
+                "VpcId": { "Ref": "Vpc" },
                 "Tags": [
                     {
                         "Key": "Name",
