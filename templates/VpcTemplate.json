@@ -1,0 +1,265 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Resources": {
+        "Vpc": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": "10.0.0.0/16",
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-vpc" }
+                    }
+                ]
+            }
+        },
+        "Subnet1": {
+            "Type":  "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "Vpc" },
+                "CidrBlock": "10.0.1.0/24",
+                "MapPublicIpOnLaunch": "true",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "0",
+                        { "Fn::GetAZs": { "Ref" : "AWS::Region" } }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-sn1" }
+                    }
+                ]
+            }
+        },
+        "Subnet2": {
+            "Type":  "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "Vpc" },
+                "CidrBlock": "10.0.2.0/24",
+                "MapPublicIpOnLaunch": "true",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "1",
+                        { "Fn::GetAZs": { "Ref" : "AWS::Region" } }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-sn2" }
+                    }
+                ]
+            }
+        },
+        "Subnet3": {
+            "Type":  "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": { "Ref": "Vpc" },
+                "CidrBlock": "10.0.3.0/24",
+                "MapPublicIpOnLaunch": "true",
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        "2",
+                        { "Fn::GetAZs": { "Ref" : "AWS::Region" } }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-sn3" }
+                    }
+                ]
+            }
+        },
+        "Gateway": {
+            "Type" : "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-igw" }
+                    }
+                ]
+            }
+        },
+        "GatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "InternetGatewayId": { "Ref": "Gateway" },
+                "VpcId": { "Ref": "Vpc" }
+            }
+        },
+        "RouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": { "Ref": "Vpc" },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-rt" }
+                    }
+                ]
+            }
+        },
+        "InetTrafficRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": { "Ref": "Gateway" },
+                "RouteTableId": { "Ref": "RouteTable" }
+            }
+        },
+        "SubnetGroup": {
+            "Type": "AWS::RDS::DBSubnetGroup",
+            "Properties": {
+                "DBSubnetGroupDescription": "used for cloning databases I guess?",
+                "SubnetIds": [
+                    { "Ref": "Subnet1" },
+                    { "Ref": "Subnet2" },
+                    { "Ref": "Subnet3" }
+                ],
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-sng" }
+                    }
+                ]
+            }
+        },
+        "SecGrp": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "used by all template instances, ELBs, etc.",
+                "SecurityGroupEgress": [
+                    {
+                        "Description": "all traffic allowed on all ports to anywhere",
+                        "IpProtocol": "-1",
+                        "FromPort": "-1",
+                        "ToPort": "-1",
+                        "CidrIp": "0.0.0.0/0"
+                    }
+                ],
+                "SecurityGroupIngress": [
+                    {
+                        "Description": "ICMP (ping, etc.) from anywhere (IPv4)",
+                        "IpProtocol": "1",
+                        "FromPort": "-1",
+                        "ToPort": "-1",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "ICMP (ping, etc.) from anywhere (IPv6)",
+                        "IpProtocol": "1",
+                        "FromPort": "-1",
+                        "ToPort": "-1",
+                        "CidrIpv6": "::/0"
+                    },
+                    {
+                        "Description": "SSH on port 22 from anywhere (IPv4)",
+                        "IpProtocol": "6",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "SSH on port 22 from anywhere (IPv6)",
+                        "IpProtocol": "6",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIpv6": "::/0"
+                    },
+                    {
+                        "Description": "HTTP on port 80 from anywhere (IPv4)",
+                        "IpProtocol": "6",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "HTTP on port 80 from anywhere (IPv6)",
+                        "IpProtocol": "6",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIpv6": "::/0"
+                    },
+                    {
+                        "Description": "postgres on port 5432 from anywhere (IPv4)",
+                        "IpProtocol": "6",
+                        "FromPort": "5432",
+                        "ToPort": "5432",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "postgres on port 5432 from anywhere (IPv6)",
+                        "IpProtocol": "6",
+                        "FromPort": "5432",
+                        "ToPort": "5432",
+                        "CidrIpv6": "::/0"
+                    },
+                    {
+                        "Description": "HTTP webserver on port 3000 from anywhere (IPv4)",
+                        "IpProtocol": "6",
+                        "FromPort": "3000",
+                        "ToPort": "3000",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "HTTP webserver on port 3000 from anywhere (IPv6)",
+                        "IpProtocol": "6",
+                        "FromPort": "3000",
+                        "ToPort": "3000",
+                        "CidrIpv6": "::/0"
+                    },
+                    {
+                        "Description": "HTTP webserver on port 8000 from anywhere (IPv4)",
+                        "IpProtocol": "6",
+                        "FromPort": "8000",
+                        "ToPort": "8000",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
+                        "Description": "HTTP webserver on port 8000 from anywhere (IPv6)",
+                        "IpProtocol": "6",
+                        "FromPort": "8000",
+                        "ToPort": "8000",
+                        "CidrIpv6": "::/0"
+                    }
+                ],
+                "VpcId": "vpc-b087e6d4",
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": { "Fn::Sub": "${AWS::StackName}-sg1" }
+                    }
+                ]
+            }
+        }
+    },
+    "Outputs": {
+        "VpcId": {
+            "Description": "the VPC id that everyone needs to reference",
+            "Value": { "Ref": "Vpc" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-VpcId" }
+            }
+        },
+        "SecGrpId": {
+            "Description": "the SecurityGroup id that everyone needs to reference",
+            "Value": { "Ref": "SecGrp" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-SecurityGroupId" }
+            }
+        },
+        "SubnetGrpId": {
+            "Description": "the SubnetGroup id that everyone needs to reference",
+            "Value": { "Ref": "SubnetGroup" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-SubnetGroupId" }
+            }
+        }
+    }
+}
