@@ -113,6 +113,27 @@
                 "RouteTableId": { "Ref": "RouteTable" }
             }
         },
+        "Subnet1RtAssoc": {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" : { "Ref": "RouteTable" },
+                "SubnetId" : { "Ref": "Subnet1" }
+            }
+        },
+        "Subnet2RtAssoc": {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" : { "Ref": "RouteTable" },
+                "SubnetId" : { "Ref": "Subnet2" }
+            }
+        },
+        "Subnet3RtAssoc": {
+            "Type" : "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties" : {
+                "RouteTableId" : { "Ref": "RouteTable" },
+                "SubnetId" : { "Ref": "Subnet3" }
+            }
+        },
         "SubnetGroup": {
             "Type": "AWS::RDS::DBSubnetGroup",
             "Properties": {
@@ -259,6 +280,27 @@
             "Value": { "Ref": "SubnetGroup" },
             "Export": {
                 "Name": { "Fn::Sub": "${AWS::StackName}-SubnetGroupId" }
+            }
+        },
+        "SubnetId1": {
+            "Description": "id for Subnet1",
+            "Value": { "Ref": "Subnet1" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-SubnetId1" }
+            }
+        },
+        "SubnetId2": {
+            "Description": "id for Subnet2",
+            "Value": { "Ref": "Subnet2" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-SubnetId2" }
+            }
+        },
+        "SubnetId3": {
+            "Description": "id for Subnet3",
+            "Value": { "Ref": "Subnet3" },
+            "Export": {
+                "Name": { "Fn::Sub": "${AWS::StackName}-SubnetId3" }
             }
         }
     }

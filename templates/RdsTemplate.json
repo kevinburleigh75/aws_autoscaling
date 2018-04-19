@@ -3,7 +3,8 @@
     "Parameters": {
         "VpcStackName": {
             "Description": "name of the VPC stack this db should be placed in",
-            "Type": "String"
+            "Type": "String",
+            "ConstraintDescription": "must be a valid VpcTemplate stack name"
         },
         "DbInstanceIdentifier": {
             "Description": "name of the db instance",
@@ -44,6 +45,7 @@
                 "VPCSecurityGroups": [
                     { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } }
                 ],
+                "PubliclyAccessible": "true",
                 "DBInstanceIdentifier": {
                     "Ref": "DbInstanceIdentifier"
                 },

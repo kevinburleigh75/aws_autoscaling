@@ -56,6 +56,11 @@
             "Type": "String",
             "ConstraintDescription": "Must be a valid SecurityGroup id"
         },
+        "VpcZoneIdentifier": {
+            "Description": "Comma-separated list of subnets ids in which instances are placed",
+            "Type": "String",
+            "ConstraintDescription": "Must be valid VPC subnet ids"
+        },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
             "Type": "AWS::EC2::KeyPair::KeyName",
@@ -141,17 +146,15 @@
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "LaunchConfigurationName": { "Ref": "Lc" },
+                "VPCZoneIdentifier": {
+                    "Fn::Split": [",", { "Ref": "VpcZoneIdentifier" }]
+                },
                 "Tags": [
                     {
                         "Key":               "Name",
                         "Value":             { "Ref": "InstanceTagName" },
                         "PropagateAtLaunch": "true"
                     }
-                ],
-                "AvailabilityZones": [
-                    "us-east-1a",
-                    "us-east-1b",
-                    "us-east-1c"
                 ],
                 "DesiredCapacity": { "Ref": "DesiredCapacity" },
                 "MinSize":         { "Ref": "MinSize" },

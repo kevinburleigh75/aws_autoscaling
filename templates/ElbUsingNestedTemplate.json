@@ -1,6 +1,11 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
     "Parameters": {
+        "VpcStackName": {
+            "Description": "name of the VPC stack this db should be placed in",
+            "Type": "String",
+            "ConstraintDescription": "must be a valid VpcTemplate stack name"
+        },
         "EnvName": {
             "Description": "Name for this environment",
             "Type": "String",
@@ -58,118 +63,16 @@
         }
     },
     "Resources": {
-        "SecGrp": {
-            "Type": "AWS::EC2::SecurityGroup",
-            "Properties": {
-                "GroupDescription": "used by all template instances, ELBs, etc.",
-                "SecurityGroupEgress": [
-                    {
-                        "Description": "all traffic allowed on all ports to anywhere",
-                        "IpProtocol": "-1",
-                        "FromPort": "-1",
-                        "ToPort": "-1",
-                        "CidrIp": "0.0.0.0/0"
-                    }
-                ],
-                "SecurityGroupIngress": [
-                    {
-                        "Description": "ICMP (ping, etc.) from anywhere (IPv4)",
-                        "IpProtocol": "1",
-                        "FromPort": "-1",
-                        "ToPort": "-1",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "ICMP (ping, etc.) from anywhere (IPv6)",
-                        "IpProtocol": "1",
-                        "FromPort": "-1",
-                        "ToPort": "-1",
-                        "CidrIpv6": "::/0"
-                    },
-                    {
-                        "Description": "SSH on port 22 from anywhere (IPv4)",
-                        "IpProtocol": "6",
-                        "FromPort": "22",
-                        "ToPort": "22",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "SSH on port 22 from anywhere (IPv6)",
-                        "IpProtocol": "6",
-                        "FromPort": "22",
-                        "ToPort": "22",
-                        "CidrIpv6": "::/0"
-                    },
-                    {
-                        "Description": "HTTP on port 80 from anywhere (IPv4)",
-                        "IpProtocol": "6",
-                        "FromPort": "80",
-                        "ToPort": "80",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "HTTP on port 80 from anywhere (IPv6)",
-                        "IpProtocol": "6",
-                        "FromPort": "80",
-                        "ToPort": "80",
-                        "CidrIpv6": "::/0"
-                    },
-                    {
-                        "Description": "postgres on port 5432 from anywhere (IPv4)",
-                        "IpProtocol": "6",
-                        "FromPort": "5432",
-                        "ToPort": "5432",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "postgres on port 5432 from anywhere (IPv6)",
-                        "IpProtocol": "6",
-                        "FromPort": "5432",
-                        "ToPort": "5432",
-                        "CidrIpv6": "::/0"
-                    },
-                    {
-                        "Description": "HTTP webserver on port 3000 from anywhere (IPv4)",
-                        "IpProtocol": "6",
-                        "FromPort": "3000",
-                        "ToPort": "3000",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "HTTP webserver on port 3000 from anywhere (IPv6)",
-                        "IpProtocol": "6",
-                        "FromPort": "3000",
-                        "ToPort": "3000",
-                        "CidrIpv6": "::/0"
-                    },
-                    {
-                        "Description": "HTTP webserver on port 8000 from anywhere (IPv4)",
-                        "IpProtocol": "6",
-                        "FromPort": "8000",
-                        "ToPort": "8000",
-                        "CidrIp": "0.0.0.0/0"
-                    },
-                    {
-                        "Description": "HTTP webserver on port 8000 from anywhere (IPv6)",
-                        "IpProtocol": "6",
-                        "FromPort": "8000",
-                        "ToPort": "8000",
-                        "CidrIpv6": "::/0"
-                    }
-                ],
-                "VpcId": "vpc-b087e6d4"
-            }
-        },
         "Elb": {
             "Type": "AWS::ElasticLoadBalancingV2::LoadBalancer",
             "Properties": {
                 "SecurityGroups": [
-                    { "Ref": "SecGrp" }
+                    { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } }
                 ],
                 "Subnets": [
-                    "subnet-206ebe56",
-                    "subnet-fc93e699",
-                    "subnet-fdab4cd7"
+                    { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                    { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                    { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
                 ]
             }
         },
@@ -257,7 +160,7 @@
                 },
                 "Port": 3000,
                 "Protocol": "HTTP",
-                "VpcId": "vpc-b087e6d4"
+                "VpcId": { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-VpcId" } }
             }
         },
         "ElbRule2": {
@@ -306,7 +209,7 @@
                 "Port": 3000,
                 "Protocol": "HTTP",
                 "UnhealthyThresholdCount": 10,
-                "VpcId": "vpc-b087e6d4"
+                "VpcId": { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-VpcId" } }
             }
         },
         "MigrationAsgStack": {
@@ -336,13 +239,20 @@
                     "RepoUrl":              { "Ref": "RepoUrl" },
                     "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
                     "ImageId":              { "Ref": "NonMigrationImageId" },
-                    "MinSize":              1,
+                    "MinSize":              0,
                     "MaxSize":              10,
                     "DesiredCapacity":      { "Ref": "OneAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-one-instance",
                     "TargetGroupArn":       { "Ref": "ElbGroup1" },
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_one.sh",
-                    "SecurityGroup":        { "Ref": "SecGrp" },
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
@@ -356,13 +266,20 @@
                     "RepoUrl":              { "Ref": "RepoUrl" },
                     "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
                     "ImageId":              { "Ref": "NonMigrationImageId" },
-                    "MinSize":              1,
+                    "MinSize":              0,
                     "MaxSize":              2,
                     "DesiredCapacity":      { "Ref": "TwoAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-two-instance",
                     "TargetGroupArn":       { "Ref": "ElbGroup2" },
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_two.sh",
-                    "SecurityGroup":        { "Ref": "SecGrp" },
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
