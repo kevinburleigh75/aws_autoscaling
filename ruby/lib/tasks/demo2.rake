@@ -526,6 +526,7 @@ namespace :demo2 do
                             worker.do_boss(count: protocol.count, modulo: protocol.modulo, protocol: protocol)
                           },
       group_uuid:         group_uuid,
+      group_desc:         ENV['AWS_ASG_SHORT_NAME'],
       instance_uuid:      SecureRandom.uuid.to_s,
       instance_desc:      ENV['AWS_INSTANCE_ID'],
       dead_record_timeout: 5.seconds,
