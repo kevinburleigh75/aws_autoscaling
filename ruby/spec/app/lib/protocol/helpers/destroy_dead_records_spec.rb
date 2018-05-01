@@ -66,16 +66,26 @@ RSpec.describe 'Protocol::Helpers.destroy_dead_records' do
       expect(undead_records).to be_empty
     end
 
-    it 'the dead_record_block should be called for each destroyed record' do
-      action
-      expect(dead_record_block.call_count).to eq(dead_records.count)
-    end
-
     it 'the other records should remain untouched' do
       action
       untouched_records = ProtocolRecord.where(group_uuid: target_group_uuid)
                                         .where(instance_modulo: live_records.map(&:instance_modulo))
       expect(untouched_records.size).to be(live_records.size)
+    end
+
+    context 'when a dead_record_block is given' do
+      it 'the dead_record_block should be called for each destroyed record' do
+        action
+        expect(dead_record_block.call_count).to eq(dead_records.count)
+      end
+    end
+
+    context 'when no dead_record_block is given' do
+      let(:dead_record_block) { }
+
+      it 'nothing explodes' do
+        action
+      end
     end
   end
 end

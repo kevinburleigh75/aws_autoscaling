@@ -11,6 +11,7 @@ class Protocol
                  instance_uuid:,
                  instance_desc:,
                  dead_record_timeout:,
+                 dead_record_block: nil,
                  reference_time:,
                  timing_modulo:,
                  timing_offset:)
@@ -29,6 +30,7 @@ class Protocol
     @instance_uuid       = instance_uuid
     @instance_desc       = instance_desc
     @dead_record_timeout = dead_record_timeout
+    @dead_record_block   = dead_record_block
     @reference_time      = reference_time
     @timing_modulo       = timing_modulo
     @timing_offset       = timing_offset
