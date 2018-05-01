@@ -212,7 +212,10 @@ class Protocol
   end
 
   def destroy_dead_records
-    @dead_records.map(&:destroy)
+    Protocol::Helpers.destroy_dead_records(
+      dead_records:      @dead_records,
+      dead_record_block: @dead_record_block,
+    )
   end
 
   def boss_block_should_be_called?(current_time:)
