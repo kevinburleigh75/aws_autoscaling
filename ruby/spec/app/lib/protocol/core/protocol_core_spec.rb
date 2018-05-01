@@ -51,6 +51,10 @@ RSpec.describe 'Protocol::Core#process' do
               .and_return(am_boss_return_value)
     allow(dbl).to receive(:has_next_boss_time?)
               .and_return(has_next_boss_time_return_value)
+    allow(dbl).to receive(:has_next_work_time?)
+              .and_return(has_next_work_time_return_value)
+    allow(dbl).to receive(:has_next_end_time?)
+              .and_return(has_next_end_time_return_value)
     allow(dbl).to receive(:clear_next_boss_time)
     allow(dbl).to receive(:destroy_dead_records)
     allow(dbl).to receive(:allocate_modulo)
@@ -76,6 +80,8 @@ RSpec.describe 'Protocol::Core#process' do
   let(:has_instance_record_return_value)         { false }
   let(:has_boss_record_return_value)             { false }
   let(:has_next_boss_time_return_value)          { false }
+  let(:has_next_work_time_return_value)          { false }
+  let(:has_next_end_time_return_value)           { false }
   let(:am_boss_return_value)                     { false }
   let(:has_next_boss_time_return_value)          { false }
   let(:allocate_modulo_return_value)             { false }
@@ -93,6 +99,8 @@ RSpec.describe 'Protocol::Core#process' do
     :update_boss_vote,
     :am_boss?,
     :has_next_boss_time?,
+    :has_next_work_time?,
+    :has_next_end_time?,
     :compute_and_set_next_boss_time,
     :clear_next_boss_time,
     :destroy_dead_records,
@@ -165,12 +173,17 @@ RSpec.describe 'Protocol::Core#process' do
     context 'when there is a boss record' do
       let(:has_boss_record_return_value) { true }
 
-      called_methods    = [:allocate_modulo, :align_with_boss, [:am_boss?,2]]
+      called_methods    = [
+        :align_with_boss,
+        :compute_next_wake_time,
+        :save_record,
+        :sleep_until_next_event,
+      ]
       uncalled_methods  = []
 
       check_method_calls(called: called_methods, uncalled: uncalled_methods)
 
-      context 'when this instance the the boss' do
+      context 'when this instance is the boss' do
         let(:am_boss_return_value) { true }
 
         called_methods    = [:destroy_dead_records]
@@ -182,13 +195,12 @@ RSpec.describe 'Protocol::Core#process' do
       context 'when the instance modulo needs to be allocated' do
         let(:allocate_modulo_return_value) { true }
 
-        called_methods = []
+        called_methods    = [:am_boss?]
         unchecked_methods = [
           :read_group_records,
           :categorize_records,
           :has_instance_record?,
           :has_boss_record?,
-          :am_boss?,
           :destroy_dead_records,
           :allocate_modulo,
         ]
@@ -200,10 +212,10 @@ RSpec.describe 'Protocol::Core#process' do
       context 'when the instance modulo does not need to be allocated' do
         let(:allocate_modulo_return_value) { false }
 
-        called_methods    = [[:am_boss?,2]]
-        uncalled_methods  = []
+          called_methods    = [[:am_boss?,2]]
+          uncalled_methods  = []
 
-        check_method_calls(called: called_methods, uncalled: uncalled_methods)
+          check_method_calls(called: called_methods, uncalled: uncalled_methods)
 
         context 'when this instance is the boss' do
           let(:am_boss_return_value) { true }
@@ -263,75 +275,86 @@ RSpec.describe 'Protocol::Core#process' do
             :destroy_dead_records,
             :compute_and_set_next_boss_time,
             :boss_block_should_be_called?,
+            :call_boss_block,
           ]
 
           check_method_calls(called: called_methods, uncalled: uncalled_methods)
         end
 
-        context 'when the end block should be called' do
-          let(:end_block_should_be_called_return_value) { true }
+        context 'when this instance has no next_end_time' do
+          let(:has_next_end_time_return_value) { false }
 
-          called_methods    = [:call_end_block]
-          uncalled_methods  = []
-
-          check_method_calls(called: called_methods, uncalled: uncalled_methods)
-
-          context 'when the end block returns truthy' do
-            let(:end_block_return_value) { true }
-
-            called_methods   = []
-            uncalled_methods = [
-              :compute_and_set_next_end_time,
-              :compute_next_wake_time,
-              :sleep_until_next_event,
-              :save_record,
-            ]
-
-            check_method_calls(called: called_methods, uncalled: uncalled_methods)
-          end
-
-          context 'when the end block returns falsy' do
-            let(:end_block_return_value) { false }
-
-            called_methods = [
-              :compute_and_set_next_end_time,
-              :compute_next_wake_time,
-              :sleep_until_next_event,
-              :save_record,
-            ]
-            uncalled_methods = []
-
-            check_method_calls(called: called_methods, uncalled: uncalled_methods)
-          end
-
-        end
-
-        context 'when the end block should not be called' do
-          let(:end_block_should_be_called_return_value) { false }
-
-          called_methods   = []
-          uncalled_methods = [:call_end_block, :compute_and_set_next_end_time]
-
-          check_method_calls(called: called_methods, uncalled: uncalled_methods)
-        end
-
-        context 'when the work block should be called' do
-          let(:work_block_should_be_called_return_value) { true }
-
-          called_methods    = [:call_work_block, :compute_and_set_next_work_time]
+          called_methods    = [:compute_and_set_next_end_time]
           uncalled_methods  = []
 
           check_method_calls(called: called_methods, uncalled: uncalled_methods)
         end
 
-        context 'when the work block should not be called' do
-          let(:work_block_should_be_called_return_value) { false }
+        context 'when this instance has a next_end_time' do
+          let(:has_next_end_time_return_value) { true }
 
-          called_methods   = []
-          uncalled_methods = [:call_work_block, :compute_and_set_next_work_time]
+          context 'when the end block should be called' do
+            let(:end_block_should_be_called_return_value) { true }
+
+            called_methods    = [
+              :call_end_block,
+              :compute_and_set_next_end_time,
+            ]
+            uncalled_methods  = []
+
+            check_method_calls(called: called_methods, uncalled: uncalled_methods)
+          end
+
+          context 'when the end block should not be called' do
+            let(:end_block_should_be_called_return_value) { false }
+
+            called_methods    = []
+            uncalled_methods  = [
+              :call_end_block,
+              :compute_and_set_next_end_time,
+            ]
+
+            check_method_calls(called: called_methods, uncalled: uncalled_methods)
+          end
+        end
+
+        context 'when this instance has no next_end_time' do
+          let(:has_next_end_time_return_value) { false }
+
+          called_methods    = [:compute_and_set_next_end_time]
+          uncalled_methods  = []
 
           check_method_calls(called: called_methods, uncalled: uncalled_methods)
         end
+
+        context 'when this instance has a next_work_time' do
+          let(:has_next_work_time_return_value) { true }
+
+          context 'when the end block should be called' do
+            let(:work_block_should_be_called_return_value) { true }
+
+            called_methods    = [
+              :call_work_block,
+              :compute_and_set_next_work_time,
+            ]
+            uncalled_methods  = []
+
+            check_method_calls(called: called_methods, uncalled: uncalled_methods)
+          end
+
+          context 'when the end block should not be called' do
+            let(:work_block_should_be_called_return_value) { false }
+
+            called_methods    = []
+            uncalled_methods  = [
+              :call_work_block,
+              :compute_and_set_next_work_time,
+            ]
+
+            check_method_calls(called: called_methods, uncalled: uncalled_methods)
+          end
+        end
+
       end
     end
   end
