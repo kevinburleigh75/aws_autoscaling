@@ -7,6 +7,7 @@ class Protocol
                  work_block:        nil,
                  min_wake_interval: nil,
                  group_uuid:,
+                 group_desc:,
                  instance_uuid:,
                  instance_desc:,
                  dead_record_timeout:,
@@ -24,6 +25,7 @@ class Protocol
     @min_wake_interval = min_wake_interval || [0.25.seconds, dead_record_timeout / 3.0].min
 
     @group_uuid          = group_uuid
+    @group_desc          = group_desc
     @instance_uuid       = instance_uuid
     @instance_desc       = instance_desc
     @dead_record_timeout = dead_record_timeout
@@ -87,6 +89,7 @@ class Protocol
   def create_instance_record
     Protocol::Helpers.create_record(
       group_uuid:    @group_uuid,
+      group_desc:    @group_desc,
       instance_uuid: @instance_uuid,
       instance_desc: @instance_desc,
     )

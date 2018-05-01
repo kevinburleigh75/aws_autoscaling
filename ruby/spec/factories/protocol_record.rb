@@ -1,6 +1,7 @@
 FactoryBot.define do
   factory :protocol_record do
     group_uuid      { SecureRandom.uuid.to_s }
+    group_desc      { 'some random group' }
 
     instance_uuid   { SecureRandom.uuid.to_s }
     instance_count  { 1 }

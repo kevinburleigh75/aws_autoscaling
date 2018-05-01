@@ -62,7 +62,7 @@
       [am_boss, boss_record]
     end
 
-    def self.create_record(group_uuid:, instance_uuid:, instance_desc:)
+    def self.create_record(group_uuid:, group_desc:, instance_uuid:, instance_desc:)
       ##
       ## There is some extra looping to protect against
       ## the possibility of accidentally violating the
@@ -79,11 +79,11 @@
           record = ActiveRecord::Base.connection_pool.with_connection do
             ProtocolRecord.create!(
               group_uuid:          group_uuid,
+              group_desc:          group_desc,
               instance_uuid:       instance_uuid,
+              instance_desc:       instance_desc,
               instance_count:      1,
               instance_modulo:     modulo,
-              instance_desc:       instance_desc,
-              asg_short_name:      ENV['AWS_ASG_SHORT_NAME'],
               boss_uuid:           instance_uuid,
               next_end_time:       nil,
               next_boss_time:      nil,

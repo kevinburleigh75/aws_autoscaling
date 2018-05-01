@@ -2,11 +2,12 @@ class CreateProtocolRecords < ActiveRecord::Migration[5.1]
   def change
     create_table :protocol_records do |t|
       t.uuid     :group_uuid,           null: false
+      t.string   :group_desc,           null: false
 
       t.uuid     :instance_uuid,        null: false
+      t.string   :instance_desc,        null: false
       t.integer  :instance_count,       null: false
       t.integer  :instance_modulo,      null: false
-      t.string   :instance_desc,        null: false
 
       t.uuid     :boss_uuid,            null: false
 

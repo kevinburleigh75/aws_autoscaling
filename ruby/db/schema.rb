@@ -38,10 +38,11 @@ ActiveRecord::Schema.define(version: 20180411174713) do
 
   create_table "protocol_records", force: :cascade do |t|
     t.uuid "group_uuid", null: false
+    t.string "group_desc", null: false
     t.uuid "instance_uuid", null: false
+    t.string "instance_desc", null: false
     t.integer "instance_count", null: false
     t.integer "instance_modulo", null: false
-    t.string "instance_desc", null: false
     t.uuid "boss_uuid", null: false
     t.datetime "next_end_time"
     t.datetime "next_boss_time"
