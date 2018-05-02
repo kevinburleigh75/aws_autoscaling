@@ -5,18 +5,22 @@ module ProtocolTest
       @counter        = 0
     end
 
-    def do_work(count:, modulo:, am_boss:)
+    def do_work(protocol:)
       @counter += 1
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.instance_desc} #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
     end
 
-    def do_boss(count:, modulo:, protocol:)
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    def do_boss(protocol:)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.instance_desc}   doing boss stuff..."
     end
 
-    def do_end(count:, modulo:, am_boss:)
-      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   end block..."
+    def do_end(protocol:)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.instance_desc}   end block..."
       return false
+    end
+
+    def do_dead_record(protocol:, record:)
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.instance_desc}   cleaning up record #{record.instance_uuid}"
     end
   end
 end
@@ -38,25 +42,30 @@ namespace :protocol do
     protocol = Protocol.new(
       min_work_interval:    work_interval,
       work_block:           lambda { |protocol:|
-                              worker.do_work(count: protocol.count, modulo: protocol.modulo, am_boss: protocol.am_boss?)
+                              worker.do_work(protocol: protocol)
                             },
       min_boss_interval:    boss_interval,
       boss_block:           lambda { |protocol:|
-                              worker.do_boss(count: protocol.count, modulo: protocol.modulo, protocol: protocol)
+                              worker.do_boss(protocol: protocol)
                             },
       min_end_interval:     end_interval,
       end_block:            lambda { |protocol:|
-                              worker.do_end(count: protocol.count, modulo: protocol.modulo, am_boss: protocol.am_boss?)
+                              worker.do_end(protocol: protocol)
                             },
       group_uuid:           group_uuid,
+      group_desc:           'some group desc',
       instance_uuid:        SecureRandom.uuid.to_s,
-      instance_desc:        ENV['AWS_INSTANCE_ID'],
+      instance_desc:        ENV['ID'] || "%05d" % Kernel.rand(1000),
       dead_record_timeout:  5.seconds,
+      dead_record_block:    lambda { |protocol:, record:|
+                              worker.do_dead_record(protocol: protocol, record: record)
+                            },
       reference_time:       Chronic.parse('Jan 1, 2000 12:00:00pm'),
       timing_modulo:        timing_modulo,
       timing_offset:        timing_offset,
     )
 
+    puts "#{Time.now.utc.iso8601(6)} #{Process.pid} starting protocol..."
     protocol.run
   end
 end

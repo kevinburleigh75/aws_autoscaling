@@ -164,9 +164,9 @@
       return false
     end
 
-    def self.destroy_dead_records(dead_records:, dead_record_block:)
+    def self.destroy_dead_records(protocol:, dead_records:, dead_record_block:)
       dead_records.each do |record|
-        dead_record_block.call(record) unless dead_record_block.nil?
+        dead_record_block.call(protocol: protocol, record: record) unless dead_record_block.nil?
         record.destroy!
       end
     end

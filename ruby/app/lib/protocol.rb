@@ -56,8 +56,16 @@ class Protocol
     @group_uuid
   end
 
+  def group_desc
+    @group_desc
+  end
+
   def instance_uuid
     @instance_uuid
+  end
+
+  def instance_desc
+    @instance_desc
   end
 
   def am_boss?
@@ -215,6 +223,7 @@ class Protocol
 
   def destroy_dead_records
     Protocol::Helpers.destroy_dead_records(
+      protocol:          self,
       dead_records:      @dead_records,
       dead_record_block: @dead_record_block,
     )
