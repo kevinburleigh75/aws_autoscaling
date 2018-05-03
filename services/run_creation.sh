@@ -11,7 +11,7 @@ echo "running bundle install..."
 RAILS_ENV=production bundle install
 
 echo "running creation..."
-until RAILS_ENV=production bundle exec rake db:drop db:create db:migrate
+until RAILS_ENV=production DISABLE_DATABASE_ENVIRONMENT_CHECK=1 bundle exec rake db:drop db:create db:migrate
 do
   echo "migration failed - trying again..."
   touch /home/ubuntu/creation_failed.txt
