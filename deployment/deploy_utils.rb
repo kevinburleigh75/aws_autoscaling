@@ -50,6 +50,18 @@ module DeployUtils
     return migration_asgs, non_migration_asgs
   end
 
+  def self.split_asgs_for_creation(asgs:)
+    creation_asgs     = asgs.select{|asg| asg.auto_scaling_group_name =~ %r/Creation/}
+    non_creation_asgs = asgs.select{|asg| asg.auto_scaling_group_name !~ %r/Creation/}
+
+    if creation_asgs.count != 1
+      abort("unexpected number of creation ASGs (#{creation_asgs.count})")
+    end
+    creation_asg = creation_asgs.first
+
+    return creation_asg, non_creation_asgs
+  end
+
   def self.get_asg_lcs(asgs:)
     client = Aws::AutoScaling::Client.new
 
@@ -59,6 +71,71 @@ module DeployUtils
     end.flatten.compact
 
     lcs
+  end
+
+  def self.create_elb_stack(stack_name:,
+                            template_url:,
+                            creation_asg:,
+                            non_creation_asgs:,
+                            image_id:)
+    client = Aws::CloudFormation::Client.new
+
+    client.create_stack(
+      stack_name:   stack_name,
+      template_url: template_url,
+      parameters: [
+        {
+          parameter_key:   'VpcStackName',
+          parameter_value: 'VpcStack',
+        },
+        {
+          parameter_key:   'EnvName',
+          parameter_value: 'blah',
+        },
+        {
+          parameter_key:   'RepoUrl',
+          parameter_value: 'https://github.com/kevinburleigh75/aws_autoscaling.git',
+        },
+        {
+          parameter_key:   'BranchNameOrSha',
+          parameter_value: 'master',
+        },
+        {
+          parameter_key:   'KeyName',
+          parameter_value: 'kevin_va_kp',
+        },
+        {
+          parameter_key:   'ElbAsgStackTemplateUrl',
+          parameter_value: 'https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json',
+        },
+        {
+          parameter_key:   'SimpleAsgStackTemplateUrl',
+          parameter_value: 'https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json',
+        },
+        {
+          parameter_key:   'NonMigrationImageId',
+          parameter_value: image_id,
+        },
+        {
+          parameter_key:   'MigrationImageId',
+          parameter_value: image_id,
+        },
+        {
+          parameter_key:   'MigrationAsgDesiredCapacity',
+          parameter_value: '0',
+        },
+        {
+          parameter_key:   'CreationAsgDesiredCapacity',
+          parameter_value: '1',
+        },
+      ].concat(non_migration_asgs.map{ |asg|
+        match_data = /^.+-(?<asg_name>.+?)Stack-/.match(asg.auto_scaling_group_name)
+        {
+          parameter_key:   "#{match_data['asg_name']}DesiredCapacity",
+          parameter_value: '0',
+        }
+      })
+    )
   end
 
   def self.update_stack(stack_name:,
@@ -88,7 +165,7 @@ module DeployUtils
         },
         {
           parameter_key:   'BranchNameOrSha',
-          parameter_value: 'klb_elb_expers',
+          parameter_value: 'master',
         },
         {
           parameter_key:   'KeyName',
@@ -113,6 +190,10 @@ module DeployUtils
         {
           parameter_key:   'MigrationAsgDesiredCapacity',
           parameter_value: is_migration ? '1' : '0',
+        },
+        {
+          parameter_key:   'CreationAsgDesiredCapacity',
+          parameter_value: '0',
         },
       ].concat(non_migration_asgs.map{ |asg|
         match_data = /^.+-(?<asg_name>.+?)Stack-/.match(asg.auto_scaling_group_name)

@@ -1,0 +1,15 @@
+[Unit]
+Description=Migration Server
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu
+ExecStart=/bin/bash /home/ubuntu/primary_repo/services/run_creation.sh
+Restart=on-abnormal
+KillSignal=SIGINT
+TimeoutStopSec=5
+
+[Install]
+WantedBy=multi-user.target
