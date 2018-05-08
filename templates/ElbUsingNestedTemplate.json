@@ -51,6 +51,11 @@
             "Type": "AWS::EC2::Image::Id",
             "ConstraintDescription": "must be the id of a valid AMI"
         },
+        "CreationAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of CreationAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
         "MigrationAsgDesiredCapacity": {
             "Description": "The DesiredCapacity of MigrationAsg",
             "Type": "Number",
@@ -210,6 +215,24 @@
                 "Protocol": "HTTP",
                 "UnhealthyThresholdCount": 10,
                 "VpcId": { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-VpcId" } }
+            }
+        },
+        "CreationAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "SimpleAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "MigrationImageId" },
+                    "MinSize":              0,
+                    "MaxSize":              10,
+                    "DesiredCapacity":      { "Ref": "CreationAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-creation-instance",
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_creation.sh",
+                    "KeyName":              { "Ref": "KeyName" }
+                }
             }
         },
         "MigrationAsgStack": {

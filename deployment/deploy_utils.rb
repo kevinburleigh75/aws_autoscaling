@@ -75,9 +75,8 @@ module DeployUtils
 
   def self.create_elb_stack(stack_name:,
                             template_url:,
-                            creation_asg:,
-                            non_creation_asgs:,
-                            image_id:)
+                            image_id:,
+                            init_asgs:)
     client = Aws::CloudFormation::Client.new
 
     client.create_stack(
@@ -128,13 +127,96 @@ module DeployUtils
           parameter_key:   'CreationAsgDesiredCapacity',
           parameter_value: '1',
         },
-      ].concat(non_migration_asgs.map{ |asg|
-        match_data = /^.+-(?<asg_name>.+?)Stack-/.match(asg.auto_scaling_group_name)
+        ## TODO: figure out how to detect these automatically
         {
-          parameter_key:   "#{match_data['asg_name']}DesiredCapacity",
+          parameter_key:   'OneAsgDesiredCapacity',
           parameter_value: '0',
-        }
-      })
+        },
+        {
+          parameter_key:   'TwoAsgDesiredCapacity',
+          parameter_value: '0',
+        },
+      ]
+      # .concat(non_migration_asgs.map{ |asg|
+      #   match_data = /^.+-(?<asg_name>.+?)Stack-/.match(asg.auto_scaling_group_name)
+      #   {
+      #     parameter_key:   "#{match_data['asg_name']}DesiredCapacity",
+      #     parameter_value: '0',
+      #   }
+      # })
+    )
+  end
+
+  def self.update_elb_stack_for_create(stack_name:,
+                                       template_url:,
+                                       image_id:)
+    client = Aws::CloudFormation::Client.new
+
+    client.update_stack(
+      stack_name:   stack_name,
+      template_url: template_url,
+      parameters: [
+        {
+          parameter_key:   'VpcStackName',
+          parameter_value: 'VpcStack',
+        },
+        {
+          parameter_key:   'EnvName',
+          parameter_value: 'blah',
+        },
+        {
+          parameter_key:   'RepoUrl',
+          parameter_value: 'https://github.com/kevinburleigh75/aws_autoscaling.git',
+        },
+        {
+          parameter_key:   'BranchNameOrSha',
+          parameter_value: 'master',
+        },
+        {
+          parameter_key:   'KeyName',
+          parameter_value: 'kevin_va_kp',
+        },
+        {
+          parameter_key:   'ElbAsgStackTemplateUrl',
+          parameter_value: 'https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json',
+        },
+        {
+          parameter_key:   'SimpleAsgStackTemplateUrl',
+          parameter_value: 'https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json',
+        },
+        {
+          parameter_key:   'NonMigrationImageId',
+          parameter_value: image_id,
+        },
+        {
+          parameter_key:   'MigrationImageId',
+          parameter_value: image_id,
+        },
+        {
+          parameter_key:   'MigrationAsgDesiredCapacity',
+          parameter_value: '0',
+        },
+        {
+          parameter_key:   'CreationAsgDesiredCapacity',
+          parameter_value: '0',
+        },
+        ## TODO: figure out how to detect these automatically
+        {
+          parameter_key:   'OneAsgDesiredCapacity',
+          parameter_value: '3',
+        },
+        {
+          parameter_key:   'TwoAsgDesiredCapacity',
+          parameter_value: '1',
+        },
+      ]
+      # .concat(non_migration_asgs.map{ |asg|
+      #   match_data = /^.+-(?<asg_name>.+?)Stack-/.match(asg.auto_scaling_group_name)
+      #   {
+      #     parameter_key:   "#{match_data['asg_name']}DesiredCapacity",
+      #     parameter_value: '0',
+      #   }
+      # })
     )
   end
 
