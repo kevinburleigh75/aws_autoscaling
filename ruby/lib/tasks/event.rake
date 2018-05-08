@@ -69,11 +69,11 @@ module Event
       end
     end
 
-    def do_work(count:, modulo:, am_boss:)
+    def do_work(protocol:)
       Rails.logger.level = :info
 
       @counter += 1
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
       start = Time.now
 
@@ -156,8 +156,8 @@ module Event
       Rails.logger.info "   create wrote #{course_events.size} events in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:, protocol:)
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    def do_boss(protocol:)
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
       # sleep(0.05)
     end
   end
@@ -173,11 +173,11 @@ module Event
       @counter           = 0
     end
 
-    def do_work(count:, modulo:, am_boss:)
-      Rails.logger.level = :info unless modulo == 0
+    def do_work(protocol:)
+      Rails.logger.level = :info unless protocol.modulo == 0
 
       @counter += 1
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
       start = Time.now
 
@@ -192,7 +192,7 @@ module Event
           WHERE course_uuid IN (
             SELECT course_uuid FROM course_event_states
             WHERE needs_attention = TRUE
-            AND   uuid_partition(course_uuid) % #{count} = #{modulo}
+            AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
             ORDER BY waiting_since ASC
             LIMIT 50
           )
@@ -201,7 +201,7 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         course_event_states = CourseEventState.find_by_sql(sql_find_and_lock_course_event_states)
-        puts "#{Time.now.utc.iso8601(6)} #{course_event_states.count} courses need attention (modulo = #{modulo})"
+        puts "#{Time.now.utc.iso8601(6)} #{course_event_states.count} courses need attention (modulo = #{protocol.modulo})"
         next 0 if course_event_states.none?
 
         ##
@@ -494,8 +494,8 @@ module Event
       Rails.logger.info "   bundle processed #{course_events_size} events in #{'%1.3e' % elapsed} sec #{elapsed > 0.5 ? 'OVER' : ''}"
     end
 
-    def do_boss(count:, modulo:, protocol:)
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    def do_boss(protocol:)
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
       # sleep(0.05)
     end
   end
@@ -535,11 +535,11 @@ module Event
       @next_course_check_time = Time.now
     end
 
-    def do_work(count:, modulo:, am_boss:)
+    def do_work(protocol:)
       Rails.logger.level = :info #unless modulo == 0
 
       @counter += 1
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}] #{am_boss ? '*' : ' '} #{@counter % 10} working away as usual..."
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
       start = Time.now
 
@@ -556,7 +556,7 @@ module Event
               SELECT course_uuid FROM stream1_client_states
               WHERE client_uuid = '#{@client_uuid}'
             )
-            AND uuid_partition(course_uuid) % #{count} = #{modulo}
+            AND uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
           }.gsub(/\n\s*/, ' ')
 
           course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
@@ -596,7 +596,7 @@ module Event
             SELECT course_uuid FROM stream#{@stream_id}_client_states
             WHERE needs_attention = TRUE
             AND   client_uuid = '#{@client_uuid}'
-            AND   uuid_partition(course_uuid) % #{count} = #{modulo}
+            AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
             ORDER BY waiting_since ASC
             LIMIT 10
           )
@@ -606,7 +606,7 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         stream_client_states = Stream1ClientState.find_by_sql(sql_find_and_lock_stream_client_states)
-        puts "#{Time.now.utc.iso8601(6)} #{stream_client_states.count} courses need attention from client #{@client_name} #{modulo} #{@client_uuid}"
+        puts "#{Time.now.utc.iso8601(6)} #{stream_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
         next 0 if stream_client_states.none?
 
         stream_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
@@ -726,8 +726,8 @@ module Event
       Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
     end
 
-    def do_boss(count:, modulo:, protocol:)
-      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{@group_uuid}:[#{modulo}/#{count}]   doing boss stuff..."
+    def do_boss(protocol:)
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
       # sleep(0.05)
     end
   end
@@ -752,17 +752,18 @@ namespace :event do
     )
 
     protocol = Protocol.new(
-      min_work_interval:  work_interval,
-      min_boss_interval:  boss_interval,
-      work_modulo:        work_modulo,
-      work_offset:        work_offset,
-      group_uuid:         group_uuid,
-      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
-                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
-                  },
-      boss_block: lambda { |instance_count:, instance_modulo:, protocol:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo, protocol: protocol)
-                  }
+      min_work_interval:   work_interval,
+      min_boss_interval:   boss_interval,
+      timing_modulo:       work_modulo,
+      timing_offset:       work_offset,
+      group_uuid:          group_uuid,
+      group_desc:          'creators',
+      instance_uuid:       SecureRandom.uuid.to_s,
+      instance_desc:       Process.pid.to_s,
+      work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
+      boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      dead_record_timeout: 10.seconds,
     )
 
     protocol.run
@@ -785,17 +786,18 @@ namespace :event do
     )
 
     protocol = Protocol.new(
-      min_work_interval:  work_interval,
-      min_boss_interval:  boss_interval,
-      work_modulo:        work_modulo,
-      work_offset:        work_offset,
-      group_uuid:         group_uuid,
-      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
-                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
-                  },
-      boss_block: lambda { |instance_count:, instance_modulo:, protocol:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo, protocol: protocol)
-                  }
+      min_work_interval:   work_interval,
+      min_boss_interval:   boss_interval,
+      timing_modulo:       work_modulo,
+      timing_offset:       work_offset,
+      group_uuid:          group_uuid,
+      group_desc:          'bundlers',
+      instance_uuid:       SecureRandom.uuid.to_s,
+      instance_desc:       Process.pid.to_s,
+      work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
+      boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      dead_record_timeout: 10.seconds,
     )
 
     protocol.run
@@ -820,17 +822,18 @@ namespace :event do
     )
 
     protocol = Protocol.new(
-      min_work_interval:  work_interval,
-      min_boss_interval:  boss_interval,
-      work_modulo:        work_modulo,
-      work_offset:        work_offset,
-      group_uuid:         group_uuid,
-      work_block: lambda { |instance_count:, instance_modulo:, am_boss:|
-                    worker.do_work(count: instance_count, modulo: instance_modulo, am_boss: am_boss)
-                  },
-      boss_block: lambda { |instance_count:, instance_modulo:, protocol:|
-                    worker.do_boss(count: instance_count, modulo: instance_modulo, protocol: protocol)
-                  }
+      min_work_interval:   work_interval,
+      min_boss_interval:   boss_interval,
+      timing_modulo:       work_modulo,
+      timing_offset:       work_offset,
+      group_uuid:          group_uuid,
+      group_desc:          'bundlers',
+      instance_uuid:       SecureRandom.uuid.to_s,
+      instance_desc:       Process.pid.to_s,
+      work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
+      boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      dead_record_timeout: 10.seconds,
     )
 
     protocol.run
