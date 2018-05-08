@@ -57,15 +57,15 @@ module Event
       end
 
       course_bundle_states = @course_uuids.map { |course_uuid|
-        Stream1CourseBundleState.new(
+        CourseBundleState.new(
           course_uuid:        course_uuid,
           needs_attention:    false,
           waiting_since:      Time.now,
         )
       }
 
-      Stream1CourseBundleState.transaction(isolation: :read_committed) do
-        Stream1CourseBundleState.import course_bundle_states
+      CourseBundleState.transaction(isolation: :read_committed) do
+        CourseBundleState.import course_bundle_states
       end
     end
 
@@ -92,14 +92,13 @@ module Event
         # puts "%s %1.3f %s" % [@event_cutoffs.map{|ec| "%1.3f" % ec}.join(','), rand_value, event_type]
 
         CourseEvent.new(
-          course_uuid:                    course_uuid,
-          course_seqnum:                  seqnum,
-          event_type:                     event_type,
-          event_uuid:                     SecureRandom.uuid.to_s,
-          event_time:                     Time.now,
-          partition_value:                Kernel.rand(1*2*3*4*5*6*7*8*9*10),
-          has_been_processed_by_stream1:  false,
-          has_been_processed_by_stream2:  false,
+          course_uuid:        course_uuid,
+          course_seqnum:      seqnum,
+          event_type:         event_type,
+          event_uuid:         SecureRandom.uuid.to_s,
+          event_time:         Time.now,
+          partition_value:    Kernel.rand(1*2*3*4*5*6*7*8*9*10),
+          has_been_processed: false,
         )
       }
 
@@ -163,9 +162,8 @@ module Event
   end
 
   class BundleWorker
-    def initialize(group_uuid:, stream_id:)
+    def initialize(group_uuid:)
       @group_uuid = group_uuid
-      @stream_id  = stream_id
 
       @max_bundle_size   = 50_000
       @max_bunele_events = 100
@@ -194,7 +192,7 @@ module Event
             WHERE needs_attention = TRUE
             AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
             ORDER BY waiting_since ASC
-            LIMIT 50
+            LIMIT 20
           )
           ORDER BY course_uuid ASC
           FOR UPDATE
@@ -211,7 +209,7 @@ module Event
         course_uuids       = course_event_states.map(&:course_uuid).uniq.sort
         course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-        max_events_per_course = 2
+        max_events_per_course = 10
 
         sql_find_and_lock_course_events = %Q{
           SELECT * FROM course_events
@@ -223,7 +221,7 @@ module Event
             LEFT JOIN LATERAL (
               SELECT * FROM course_events
               WHERE course_uuid = courses_oi.course_uuid
-              AND has_been_processed_by_stream#{@stream_id} = FALSE
+              AND has_been_processed = FALSE
               ORDER BY course_uuid, course_seqnum ASC
               LIMIT #{max_events_per_course}
             ) xx ON TRUE
@@ -243,40 +241,40 @@ module Event
         ##
 
         sql_find_and_lock_bundle_states = %Q{
-          SELECT * FROM stream1_course_bundle_states
+          SELECT * FROM course_bundle_states
           WHERE course_uuid IN ( #{course_uuid_values} )
           ORDER BY course_uuid
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        bundle_states = Stream1CourseBundleState.find_by_sql(sql_find_and_lock_bundle_states)
+        bundle_states = CourseBundleState.find_by_sql(sql_find_and_lock_bundle_states)
 
         ##
         ## Find and lock the client states for the target courses.
         ##
 
-        sql_find_and_lock_stream_client_states = %Q{
-          SELECT * FROM stream1_client_states
+        sql_find_and_lock_course_client_states = %Q{
+          SELECT * FROM course_client_states
           WHERE course_uuid IN ( #{course_uuid_values} )
           ORDER BY course_uuid, client_uuid ASC
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        client_states = Stream1ClientState.find_by_sql(sql_find_and_lock_stream_client_states)
+        client_states = CourseClientState.find_by_sql(sql_find_and_lock_course_client_states)
 
         ##
-        ## Find the currently open bundles for the target stream.
+        ## Find the currently open bundles for the course stream.
         ##
 
-        sql_find_and_lock_stream_bundles = %Q{
-          SELECT * FROM stream#{@stream_id}_bundles
+        sql_find_and_lock_course_bundles = %Q{
+          SELECT * FROM course_bundles
           WHERE is_open = TRUE
           AND course_uuid IN ( #{course_uuid_values} )
           ORDER BY uuid ASC
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        existing_stream_bundles = Stream1Bundle.find_by_sql(sql_find_and_lock_stream_bundles)
+        existing_course_bundles = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
 
         ##
         ## Process the course events, grouped by course
@@ -305,7 +303,7 @@ module Event
           target_course_events.each{|ee| puts "#{Time.now.utc.iso8601(6)}      event #{ee.event_uuid} seqnum #{ee.course_seqnum}"}
 
           target_course_event_state = course_event_states.detect{|es| es.course_uuid == target_course_uuid}
-          target_course_open_bundle = existing_stream_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
+          target_course_open_bundle = existing_course_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
           gap_found                 = false
           new_last_course_seqnum    = target_course_event_state.last_course_seqnum
 
@@ -323,7 +321,7 @@ module Event
               break
             end
 
-            event.has_been_processed_by_stream1 = true
+            event.has_been_processed = true
             events_to_update << event
 
             activity_by_course_uuid[target_course_uuid][:activity]          = true
@@ -347,7 +345,7 @@ module Event
 
             if target_course_open_bundle.nil?
               puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
-              target_course_open_bundle = Stream1Bundle.new(
+              target_course_open_bundle = CourseBundle.new(
                 uuid:                   SecureRandom.uuid.to_s,
                 course_uuid:            event.course_uuid,
                 course_event_seqnum_lo: event.course_seqnum,
@@ -373,12 +371,12 @@ module Event
             target_course_open_bundle.waiting_since      = Time.now
 
             ##
-            ## Create a bundle entry for this event/stream combo.
+            ## Create a bundle entry for the course event stream.
             ##
 
-            bundle_entries_to_create << Stream1BundleEntry.new(
+            bundle_entries_to_create << CourseBundleEntry.new(
               course_event_uuid:  event.event_uuid,
-              stream_bundle_uuid: target_course_open_bundle.uuid,
+              course_bundle_uuid: target_course_open_bundle.uuid,
             )
 
             ##
@@ -441,47 +439,47 @@ module Event
         ## Do bulk creates/updates
         ##
 
-        Stream1BundleEntry.import bundle_entries_to_create
+        CourseBundleEntry.import bundle_entries_to_create
 
-        Stream1Bundle.import bundles_to_create
-        Stream1Bundle.import(
-          existing_stream_bundles,
+        CourseBundle.import bundles_to_create
+        CourseBundle.import(
+          existing_course_bundles,
           on_duplicate_key_update: {
-            conflict_target: [:uuid],
-            columns:         Stream1Bundle.column_names - ['updated_at', 'created_at']
+            conflict_target:  [:uuid],
+            columns:          CourseBundle.column_names - ['updated_at', 'created_at']
           }
         )
 
 
-        Stream1CourseBundleState.import(
+        CourseBundleState.import(
           bundle_states,
           on_duplicate_key_update: {
-            conflict_target: [:course_uuid],
-            columns:         Stream1CourseBundleState.column_names - ['updated_at', 'created_at']
+            conflict_target:  [:course_uuid],
+            columns:          CourseBundleState.column_names - ['updated_at', 'created_at']
           }
         )
 
         CourseEvent.import(
           course_events,
           on_duplicate_key_update: {
-            conflict_target: [:event_uuid],
-            columns: CourseEvent.column_names - ['updated_at', 'created_at']
+            conflict_target:  [:event_uuid],
+            columns:          CourseEvent.column_names - ['updated_at', 'created_at']
           }
         )
 
         CourseEventState.import(
           course_event_states,
           on_duplicate_key_update: {
-            conflict_target: [:course_uuid],
-            columns: CourseEventState.column_names - ['updated_at', 'created_at']
+            conflict_target:  [:course_uuid],
+            columns:          CourseEventState.column_names - ['updated_at', 'created_at']
           }
         )
 
-        Stream1ClientState.import(
+        CourseClientState.import(
           client_states,
           on_duplicate_key_update: {
-            conflict_target: [:client_uuid, :course_uuid],
-            columns: Stream1ClientState.column_names - ['updated_at', 'created_at']
+            conflict_target:  [:client_uuid, :course_uuid],
+            columns:          CourseClientState.column_names - ['updated_at', 'created_at']
           }
         )
 
@@ -501,26 +499,25 @@ module Event
   end
 
   class FetchWorker
-    def initialize(group_uuid:, stream_id:, client_name:)
+    def initialize(group_uuid:, client_name:)
       @group_uuid  = group_uuid
-      @stream_id   = stream_id
       @client_name = client_name
 
       @counter = 0
 
       ##
-      ## Add an entry to the stream's client table, if needed.
+      ## Add an entry to the course stream's client table, if needed.
       ##
 
       client = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
         sql_find_clients = %Q{
-          SELECT * FROM stream1_clients
+          SELECT * FROM course_clients
           WHERE name = '#{@client_name}'
         }.gsub(/\n\s*/, ' ')
 
-        client = Stream1Client.find_by_sql(sql_find_clients).first
+        client = CourseClient.find_by_sql(sql_find_clients).first
         if client.nil?
-          client = Stream1Client.new(
+          client = CourseClient.new(
             uuid: SecureRandom.uuid.to_s,
             name: @client_name,
           )
@@ -553,7 +550,7 @@ module Event
           sql_find_course_event_states = %Q{
             SELECT * FROM course_event_states
             WHERE course_uuid NOT IN (
-              SELECT course_uuid FROM stream1_client_states
+              SELECT course_uuid FROM course_client_states
               WHERE client_uuid = '#{@client_uuid}'
             )
             AND uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
@@ -565,7 +562,7 @@ module Event
           current_time = Time.now
 
           client_states = course_event_states.map{ |event_state|
-            Stream1ClientState.new(
+            CourseClientState.new(
               client_uuid:                  @client_uuid,
               course_uuid:                  event_state.course_uuid,
               last_confirmed_course_seqnum: -1,
@@ -574,7 +571,7 @@ module Event
             )
           }
 
-          Stream1ClientState.import client_states
+          CourseClientState.import client_states
         end
         elapsed = Time.now - start
         puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
@@ -590,10 +587,10 @@ module Event
         ## Find and lock the client states needing attention.
         ##
 
-        sql_find_and_lock_stream_client_states = %Q{
-          SELECT * FROM stream#{@stream_id}_client_states
+        sql_find_and_lock_course_client_states = %Q{
+          SELECT * FROM course_client_states
           WHERE course_uuid IN (
-            SELECT course_uuid FROM stream#{@stream_id}_client_states
+            SELECT course_uuid FROM course_client_states
             WHERE needs_attention = TRUE
             AND   client_uuid = '#{@client_uuid}'
             AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
@@ -605,29 +602,29 @@ module Event
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        stream_client_states = Stream1ClientState.find_by_sql(sql_find_and_lock_stream_client_states)
-        puts "#{Time.now.utc.iso8601(6)} #{stream_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
-        next 0 if stream_client_states.none?
+        course_client_states = CourseClientState.find_by_sql(sql_find_and_lock_course_client_states)
+        puts "#{Time.now.utc.iso8601(6)} #{course_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
+        next 0 if course_client_states.none?
 
-        stream_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
+        course_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
 
         ##
         ## For each state (course) of interest, find the next bundle for this client.
         ##
 
-        course_uuids       = stream_client_states.map(&:course_uuid).sort
+        course_uuids       = course_client_states.map(&:course_uuid).sort
         course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-        sql_find_stream_bundles = %Q{
-          SELECT * FROM stream#{@stream_id}_bundles
+        sql_find_course_bundles = %Q{
+          SELECT * FROM course_bundles
           WHERE uuid IN (
             SELECT xx.uuid FROM (
-              SELECT * FROM stream#{@stream_id}_client_states
+              SELECT * FROM course_client_states
               WHERE course_uuid IN ( #{course_uuid_values} )
               AND   client_uuid = '#{@client_uuid}'
             ) client_states_oi
             LEFT JOIN LATERAL (
-              SELECT * FROM stream#{@stream_id}_bundles
+              SELECT * FROM course_bundles
               WHERE course_uuid = client_states_oi.course_uuid
               AND course_event_seqnum_hi > client_states_oi.last_confirmed_course_seqnum
               ORDER BY course_event_seqnum_hi ASC
@@ -636,29 +633,29 @@ module Event
           )
         }.gsub(/\n\s*/, ' ')
 
-        stream_bundles = Stream1Bundle.find_by_sql(sql_find_stream_bundles)
-        puts "#{Time.now.utc.iso8601(6)} found #{stream_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
+        course_bundles = CourseBundle.find_by_sql(sql_find_course_bundles)
+        puts "#{Time.now.utc.iso8601(6)} found #{course_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
 
         num_processed_events = 0
-        if stream_bundles.any?
+        if course_bundles.any?
           ##
           ## Find the events associated with the bundles.
           ##
 
-          bundle_uuids       = stream_bundles.map(&:uuid).sort
+          bundle_uuids       = course_bundles.map(&:uuid).sort
           bundle_uuid_values = bundle_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
           sql_find_course_events = %Q{
             SELECT * FROM course_events
             WHERE event_uuid IN (
-              SELECT course_event_uuid FROM stream#{@stream_id}_bundle_entries
-              WHERE stream_bundle_uuid in ( #{bundle_uuid_values} )
+              SELECT course_event_uuid FROM course_bundle_entries
+              WHERE course_bundle_uuid in ( #{bundle_uuid_values} )
             )
           }.gsub(/\n\s*/, ' ')
 
           course_events = CourseEvent.find_by_sql(sql_find_course_events)
                                      .select{ |event|
-                                       last_confirmed_course_seqnum = stream_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
+                                       last_confirmed_course_seqnum = course_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
                                        event.course_seqnum > last_confirmed_course_seqnum
                                       }
 
@@ -686,16 +683,16 @@ module Event
           num_processed_events = course_events.count
         end
 
-        puts "#{Time.now.utc.iso8601(6)} finished processing stream bundles"
+        puts "#{Time.now.utc.iso8601(6)} finished processing course bundles"
 
         ##
         ## Update client states.
         ##
 
-        stream_client_states.each do |client_state|
+        course_client_states.each do |client_state|
           puts "#{Time.now.utc.iso8601(6)} updating client state for course #{client_state.course_uuid}"
 
-          bundles = stream_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
+          bundles = course_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
                                   .sort_by{|bundle| bundle.course_event_seqnum_hi}
 
           puts "#{Time.now.utc.iso8601(6)}   #{bundles.count} bundles"
@@ -708,11 +705,11 @@ module Event
           end
         end
 
-        Stream1ClientState.import(
-          stream_client_states,
+        CourseClientState.import(
+          course_client_states,
           on_duplicate_key_update: {
             conflict_target: [:course_uuid, :client_uuid],
-            columns:         Stream1ClientState.column_names - ['updated_at', 'created_at']
+            columns:         CourseClientState.column_names - ['updated_at', 'created_at']
           }
         )
 
@@ -762,7 +759,7 @@ namespace :event do
       instance_desc:       Process.pid.to_s,
       work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
       boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
-      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00:00.001pm'),
       dead_record_timeout: 10.seconds,
     )
 
@@ -772,17 +769,15 @@ end
 
 namespace :event do
   desc 'bundle course events into per-course streams'
-  task :bundle, [:group_uuid, :work_interval, :work_modulo, :work_offset, :stream_id] => :environment do |t, args|
+  task :bundle, [:group_uuid, :work_interval, :work_modulo, :work_offset] => :environment do |t, args|
     group_uuid          = args[:group_uuid]
     work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
     boss_interval       = Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
     work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
-    stream_id           = args[:stream_id]
 
     worker = Event::BundleWorker.new(
       group_uuid: group_uuid,
-      stream_id:  stream_id,
     )
 
     protocol = Protocol.new(
@@ -796,7 +791,7 @@ namespace :event do
       instance_desc:       Process.pid.to_s,
       work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
       boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
-      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00:00.002 pm'),
       dead_record_timeout: 10.seconds,
     )
 
@@ -806,18 +801,16 @@ end
 
 namespace :event do
   desc 'fetch events'
-  task :fetch, [:group_uuid, :work_interval, :work_modulo, :work_offset, :stream_id, :client_name] => :environment do |t, args|
+  task :fetch, [:group_uuid, :work_interval, :work_modulo, :work_offset, :client_name] => :environment do |t, args|
     group_uuid          = args[:group_uuid]
     work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
     boss_interval       = Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
     work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
-    stream_id           = args[:stream_id]
     client_name         = args[:client_name]
 
     worker = Event::FetchWorker.new(
       group_uuid:   group_uuid,
-      stream_id:    stream_id,
       client_name:  client_name,
     )
 
@@ -827,12 +820,12 @@ namespace :event do
       timing_modulo:       work_modulo,
       timing_offset:       work_offset,
       group_uuid:          group_uuid,
-      group_desc:          'bundlers',
+      group_desc:          'fetchers',
       instance_uuid:       SecureRandom.uuid.to_s,
       instance_desc:       Process.pid.to_s,
       work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
       boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
-      reference_time:      Chronic.parse('Jan 1, 2000 12:00pm'),
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00:00.003 pm'),
       dead_record_timeout: 10.seconds,
     )
 
