@@ -133,12 +133,4 @@ ActiveRecord::Schema.define(version: 20171203135751) do
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
   end
 
-  create_table "stream1_bundle_receipts", force: :cascade do |t|
-    t.uuid "stream1_client_uuid", null: false
-    t.uuid "stream1_bundle_uuid", null: false
-    t.boolean "has_been_acknowledged", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-  end
-
 end
