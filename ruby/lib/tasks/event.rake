@@ -166,7 +166,7 @@ module Event
       @group_uuid = group_uuid
 
       @max_bundle_size   = 50_000
-      @max_bunele_events = 100
+      @max_bundle_events = 100
 
       @counter           = 0
     end
@@ -338,7 +338,7 @@ module Event
 
             if target_course_open_bundle &&
                ( (target_course_open_bundle.size + event_size > @max_bundle_size) ||
-                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
+                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
               target_course_open_bundle.is_open = false
               target_course_open_bundle         = nil
             end
@@ -363,7 +363,7 @@ module Event
             end
 
             if ( (target_course_open_bundle.size >= @max_bundle_size) ||
-                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bunele_events) )
+                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
               target_course_open_bundle.is_open = false
             end
 
