@@ -6,6 +6,8 @@ class CreateCourseClientStates < ActiveRecord::Migration[5.1]
       t.integer   :last_confirmed_course_seqnum, null: false
       t.boolean   :needs_attention,              null: false
       t.timestamp :waiting_since,                null: false
+
+      t.timestamps null: false
     end
 
     add_index :course_client_states, :client_uuid

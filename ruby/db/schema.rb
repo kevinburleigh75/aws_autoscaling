@@ -73,6 +73,8 @@ ActiveRecord::Schema.define(version: 20180510073030) do
     t.integer "last_confirmed_course_seqnum", null: false
     t.boolean "needs_attention", null: false
     t.datetime "waiting_since", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
     t.index ["client_uuid", "course_uuid", "last_confirmed_course_seqnum"], name: "index_ccss_on_cu_cu_lccs"
     t.index ["client_uuid", "course_uuid"], name: "index_ccss_on_cu_cu", unique: true
     t.index ["client_uuid"], name: "index_course_client_states_on_client_uuid"
