@@ -172,7 +172,7 @@ module Event
     end
 
     def do_work(protocol:)
-      Rails.logger.level = :info unless protocol.modulo == 0
+      Rails.logger.level = :info #unless protocol.modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
