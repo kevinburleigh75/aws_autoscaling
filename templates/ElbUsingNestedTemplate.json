@@ -61,10 +61,25 @@
             "Type": "Number",
             "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
         },
+        "EventCreateAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of EventCreateAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "EventBundleAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of EventBundleAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
+        "EventFetchAsgDesiredCapacity": {
+            "Description": "The DesiredCapacity of EventFetchAsg",
+            "Type": "Number",
+            "ConstraintDescription": "Must be between MinSize and MaxSize (inclusive)"
+        },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
             "Type": "AWS::EC2::KeyPair::KeyName",
-            "ConstraintDescription": "must be the name of an existing EC2 KeyPair."
+            "ConstraintDescription": "must be the name of an existing EC2 KeyPair"
         }
     },
     "Resources": {
@@ -303,6 +318,60 @@
                             { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
                         ]]
                     },
+                    "KeyName":              { "Ref": "KeyName" }
+                }
+            }
+        },
+        "EventCreateAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "SimpleAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "NonMigrationImageId" },
+                    "MinSize":              0,
+                    "MaxSize":              30,
+                    "DesiredCapacity":      { "Ref": "EventCreateAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-event-create-instance",
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_create.sh",
+                    "KeyName":              { "Ref": "KeyName" }
+                }
+            }
+        },
+        "EventBundleAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "SimpleAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "NonMigrationImageId" },
+                    "MinSize":              0,
+                    "MaxSize":              30,
+                    "DesiredCapacity":      { "Ref": "EventBundleAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-event-create-instance",
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_bundle.sh",
+                    "KeyName":              { "Ref": "KeyName" }
+                }
+            }
+        },
+        "EventFetchAsgStack": {
+            "Type": "AWS::CloudFormation::Stack",
+            "Properties": {
+                "TemplateURL": { "Ref": "SimpleAsgStackTemplateUrl" },
+                "Parameters": {
+                    "EnvName":              { "Ref": "EnvName" },
+                    "RepoUrl":              { "Ref": "RepoUrl" },
+                    "BranchNameOrSha":      { "Ref": "BranchNameOrSha" },
+                    "ImageId":              { "Ref": "NonMigrationImageId" },
+                    "MinSize":              0,
+                    "MaxSize":              30,
+                    "DesiredCapacity":      { "Ref": "EventFetchAsgDesiredCapacity" },
+                    "InstanceTagName":      "asg-event-create-instance",
+                    "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_fetch.sh",
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }

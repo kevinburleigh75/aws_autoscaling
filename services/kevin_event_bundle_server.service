@@ -1,12 +1,12 @@
 [Unit]
-Description=Creation Server
+Description=Event Bundle Server
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
-ExecStart=/bin/bash /home/ubuntu/primary_repo/services/run_creation.sh
+ExecStart=/bin/bash /home/ubuntu/primary_repo/services/run_event_bundle.sh
 Restart=on-abnormal
 KillSignal=SIGINT
 TimeoutStopSec=5
