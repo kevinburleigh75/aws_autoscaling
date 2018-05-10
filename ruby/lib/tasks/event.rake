@@ -503,31 +503,10 @@ module Event
       @group_uuid  = group_uuid
       @client_name = client_name
 
+      @client_uuid = nil
+      @known_course_uuids = []
+
       @counter = 0
-
-      ##
-      ## Add an entry to the course stream's client table, if needed.
-      ##
-
-      client = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-        sql_find_clients = %Q{
-          SELECT * FROM course_clients
-          WHERE name = '#{@client_name}'
-        }.gsub(/\n\s*/, ' ')
-
-        client = CourseClient.find_by_sql(sql_find_clients).first
-        if client.nil?
-          client = CourseClient.new(
-            uuid: SecureRandom.uuid.to_s,
-            name: @client_name,
-          )
-          client.save!
-        end
-
-        client
-      end
-
-      @client_uuid = client.uuid
 
       @next_course_check_time = Time.now
     end
@@ -535,49 +514,28 @@ module Event
     def do_work(protocol:)
       Rails.logger.level = :info #unless modulo == 0
 
+      ##
+      ## If @client_uuid has not been set, try to set it.
+      ##
+
+      unless @client_uuid
+        ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+          sql_find_clients = %Q{
+            SELECT * FROM course_clients
+            WHERE name = '#{@client_name}'
+          }.gsub(/\n\s*/, ' ')
+
+          client = CourseClient.find_by_sql(sql_find_clients).first
+          return if client.nil?
+
+          @client_uuid = client.uuid
+        end
+      end
+
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
       start = Time.now
-
-      if Time.now > @next_course_check_time
-        puts "#{Time.now.utc.iso8601(6)} starting course check transaction"
-        ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-          ##
-          ## Create client states for any missing courses.
-          ##
-
-          sql_find_course_event_states = %Q{
-            SELECT * FROM course_event_states
-            WHERE course_uuid NOT IN (
-              SELECT course_uuid FROM course_client_states
-              WHERE client_uuid = '#{@client_uuid}'
-            )
-            AND uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
-          }.gsub(/\n\s*/, ' ')
-
-          course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
-          puts "adding #{course_event_states.count} courses for client #{@client_name} #{@client_uuid}"
-
-          current_time = Time.now
-
-          client_states = course_event_states.map{ |event_state|
-            CourseClientState.new(
-              client_uuid:                  @client_uuid,
-              course_uuid:                  event_state.course_uuid,
-              last_confirmed_course_seqnum: -1,
-              needs_attention:              true,
-              waiting_since:                current_time,
-            )
-          }
-
-          CourseClientState.import client_states
-        end
-        elapsed = Time.now - start
-        puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
-
-        @next_course_check_time += (2.5 + 5*Kernel.rand).seconds
-      end
 
       puts "#{Time.now.utc.iso8601(6)} starting transaction"
       num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
@@ -725,7 +683,73 @@ module Event
 
     def do_boss(protocol:)
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
-      # sleep(0.05)
+
+      start = Time.now
+
+      ##
+      ## Add an entry to the course stream's client table, if needed.
+      ##
+
+      unless @client_uuid
+        client = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+          sql_find_clients = %Q{
+            SELECT * FROM course_clients
+            WHERE name = '#{@client_name}'
+          }.gsub(/\n\s*/, ' ')
+
+          client = CourseClient.find_by_sql(sql_find_clients).first
+          if client.nil?
+            client = CourseClient.new(
+              uuid: SecureRandom.uuid.to_s,
+              name: @client_name,
+            )
+            client.save!
+          end
+
+          client
+        end
+
+        @client_uuid = client.uuid
+      end
+
+      ##
+      ## Create client states for any missing courses.
+      ##
+
+      puts "#{Time.now.utc.iso8601(6)} starting course check transaction"
+      ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+        sql_find_course_event_states = %Q{
+          SELECT * FROM course_event_states
+          WHERE course_uuid NOT IN (
+            SELECT course_uuid FROM course_client_states
+            WHERE client_uuid = '#{@client_uuid}'
+          )
+          AND uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
+        }.gsub(/\n\s*/, ' ')
+
+        course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
+        unknown_course_uuids = course_event_states.map(&:course_uuid) - @known_course_uuids
+
+        puts "adding #{unknown_course_uuids.count} course client states"
+
+        current_time = Time.now
+
+        client_states = unknown_course_uuids.map{ |course_uuid|
+          CourseClientState.new(
+            client_uuid:                  @client_uuid,
+            course_uuid:                  course_uuid,
+            last_confirmed_course_seqnum: -1,
+            needs_attention:              true,
+            waiting_since:                current_time,
+          )
+        }
+
+        CourseClientState.import client_states
+
+        @known_course_uuids += unknown_course_uuids
+      end
+      elapsed = Time.now - start
+      puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
     end
   end
 
@@ -804,7 +828,7 @@ namespace :event do
   task :fetch, [:group_uuid, :work_interval, :work_modulo, :work_offset, :client_name] => :environment do |t, args|
     group_uuid          = args[:group_uuid]
     work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
-    boss_interval       = Rails.env.production? ? 30.seconds : 5.seconds
+    boss_interval       = 1.0.seconds #Rails.env.production? ? 30.seconds : 5.seconds
     work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
     work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
     client_name         = args[:client_name]
