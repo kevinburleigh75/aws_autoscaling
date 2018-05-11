@@ -352,7 +352,7 @@
                     "MinSize":              0,
                     "MaxSize":              30,
                     "DesiredCapacity":      { "Ref": "EventBundleAsgDesiredCapacity" },
-                    "InstanceTagName":      "asg-event-create-instance",
+                    "InstanceTagName":      "asg-event-bundle-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_bundle.sh",
                     "KeyName":              { "Ref": "KeyName" }
                 }
@@ -370,7 +370,7 @@
                     "MinSize":              0,
                     "MaxSize":              30,
                     "DesiredCapacity":      { "Ref": "EventFetchAsgDesiredCapacity" },
-                    "InstanceTagName":      "asg-event-create-instance",
+                    "InstanceTagName":      "asg-event-fetch-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_fetch.sh",
                     "KeyName":              { "Ref": "KeyName" }
                 }
