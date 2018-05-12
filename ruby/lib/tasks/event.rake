@@ -504,11 +504,8 @@ module Event
       @client_name = client_name
 
       @client_uuid = nil
-      @known_course_uuids = []
 
       @counter = 0
-
-      @next_course_check_time = Time.now
     end
 
     def do_work(protocol:)
@@ -724,20 +721,18 @@ module Event
             SELECT course_uuid FROM course_client_states
             WHERE client_uuid = '#{@client_uuid}'
           )
-          AND uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
         }.gsub(/\n\s*/, ' ')
 
         course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
-        unknown_course_uuids = course_event_states.map(&:course_uuid) - @known_course_uuids
 
-        puts "adding #{unknown_course_uuids.count} course client states"
+        puts "adding #{course_event_states.count} course client states"
 
         current_time = Time.now
 
-        client_states = unknown_course_uuids.map{ |course_uuid|
+        client_states = course_event_states.map{ |client_state|
           CourseClientState.new(
             client_uuid:                  @client_uuid,
-            course_uuid:                  course_uuid,
+            course_uuid:                  client_state.course_uuid,
             last_confirmed_course_seqnum: -1,
             needs_attention:              true,
             waiting_since:                current_time,
@@ -745,8 +740,6 @@ module Event
         }
 
         CourseClientState.import client_states
-
-        @known_course_uuids += unknown_course_uuids
       end
       elapsed = Time.now - start
       puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
