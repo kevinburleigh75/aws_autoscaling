@@ -213,7 +213,32 @@ aws cloudformation create-stack \
       ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
       ParameterKey=NonMigrationImageId,ParameterValue=ami-0685143a4a8d94005 \
       ParameterKey=MigrationImageId,ParameterValue=ami-0685143a4a8d94005 \
+      ParameterKey=CreationAsgDesiredCapacity,ParameterValue=0 \
       ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=0 \
-      ParameterKey=OneAsgDesiredCapacity,ParameterValue=3 \
-      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=1 \
+      ParameterKey=OneAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventCreateAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventBundleAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventFetchAsgDesiredCapacity,ParameterValue=0 \
+  --stack-name VpcElbStack
+
+aws cloudformation update-stack \
+  --template-body file://../templates/ElbUsingNestedTemplate.json \
+  --parameters \
+      ParameterKey=VpcStackName,ParameterValue=VpcStack \
+      ParameterKey=EnvName,ParameterValue=blah \
+      ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
+      ParameterKey=BranchNameOrSha,ParameterValue=master \
+      ParameterKey=KeyName,ParameterValue=kevin_va_kp \
+      ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
+      ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
+      ParameterKey=NonMigrationImageId,ParameterValue=ami-0685143a4a8d94005 \
+      ParameterKey=MigrationImageId,ParameterValue=ami-0685143a4a8d94005 \
+      ParameterKey=CreationAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=MigrationAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=OneAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=TwoAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventCreateAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventBundleAsgDesiredCapacity,ParameterValue=0 \
+      ParameterKey=EventFetchAsgDesiredCapacity,ParameterValue=0 \
   --stack-name VpcElbStack
