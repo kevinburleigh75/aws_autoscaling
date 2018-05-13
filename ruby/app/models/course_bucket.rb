@@ -1,0 +1,2 @@
+class CourseBucket < ApplicationRecord
+end

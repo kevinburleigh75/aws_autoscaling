@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180510073030) do
+ActiveRecord::Schema.define(version: 20180513071236) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -22,6 +22,36 @@ ActiveRecord::Schema.define(version: 20180510073030) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.integer "desired_capacity", null: false
+  end
+
+  create_table "bundle_buckets", force: :cascade do |t|
+    t.uuid "bucket_uuid", null: false
+    t.integer "bucket_num", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bucket_num"], name: "index_bundle_buckets_on_bucket_num", unique: true
+    t.index ["bucket_uuid"], name: "index_bundle_buckets_on_bucket_uuid", unique: true
+  end
+
+  create_table "bundle_course_indicators", force: :cascade do |t|
+    t.uuid "indicator_uuid", null: false
+    t.uuid "course_uuid", null: false
+    t.string "source", null: false
+    t.boolean "has_been_processed", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["course_uuid", "has_been_processed", "created_at"], name: "index_bcis_on_cu_hbp_ca"
+    t.index ["has_been_processed", "course_uuid", "created_at"], name: "index_bcis_on_hbp_cu_ca"
+    t.index ["indicator_uuid"], name: "index_bundle_course_indicators_on_indicator_uuid", unique: true
+  end
+
+  create_table "course_buckets", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "bucket_num", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bucket_num", "course_uuid"], name: "index_course_buckets_on_bucket_num_and_course_uuid"
+    t.index ["course_uuid"], name: "index_course_buckets_on_course_uuid", unique: true
   end
 
   create_table "course_bundle_entries", force: :cascade do |t|
@@ -112,17 +142,16 @@ ActiveRecord::Schema.define(version: 20180510073030) do
     t.string "event_type", null: false
     t.uuid "event_uuid", null: false
     t.datetime "event_time", null: false
-    t.integer "partition_value", null: false
-    t.boolean "has_been_processed", null: false
+    t.boolean "has_been_bundled", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
-    t.index ["course_uuid", "has_been_processed", "course_seqnum"], name: "index_ces_on_cu_hbp_csn"
+    t.index ["course_uuid", "has_been_bundled", "course_seqnum"], name: "index_ces_on_cu_hbb_csn"
     t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
-    t.index ["event_uuid", "has_been_processed", "course_seqnum"], name: "index_ces_on_eu_hbp_csn"
+    t.index ["event_uuid", "has_been_bundled", "course_seqnum"], name: "index_ces_on_eu_hbb_csn"
     t.index ["event_uuid"], name: "index_course_events_on_event_uuid", unique: true
-    t.index ["has_been_processed", "course_uuid", "course_seqnum"], name: "index_ce_on_hbp_cu_csn"
-    t.index ["has_been_processed"], name: "index_course_events_on_has_been_processed"
+    t.index ["has_been_bundled", "course_uuid", "course_seqnum"], name: "index_ce_on_hbb_cu_csn"
+    t.index ["has_been_bundled"], name: "index_course_events_on_has_been_bundled"
   end
 
   create_table "health_check_events", force: :cascade do |t|

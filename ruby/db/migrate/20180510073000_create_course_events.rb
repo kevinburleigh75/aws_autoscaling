@@ -7,8 +7,7 @@ class CreateCourseEvents < ActiveRecord::Migration[5.1]
       t.uuid      :event_uuid,      null: false
       t.datetime  :event_time,      null: false
 
-      t.integer   :partition_value,    null: false
-      t.boolean   :has_been_processed, null: false
+      t.boolean   :has_been_bundled, null: false
 
       t.timestamps null: false
     end
@@ -19,18 +18,18 @@ class CreateCourseEvents < ActiveRecord::Migration[5.1]
     add_index :course_events, [:course_uuid, :course_seqnum],
                               unique: true
 
-    add_index :course_events, [:course_uuid, :has_been_processed, :course_seqnum],
-                              name: 'index_ces_on_cu_hbp_csn'
+    add_index :course_events, [:course_uuid, :has_been_bundled, :course_seqnum],
+                              name: 'index_ces_on_cu_hbb_csn'
 
-    add_index :course_events, [:event_uuid, :has_been_processed, :course_seqnum],
-                              name: 'index_ces_on_eu_hbp_csn'
+    add_index :course_events, [:event_uuid, :has_been_bundled, :course_seqnum],
+                              name: 'index_ces_on_eu_hbb_csn'
 
     add_index :course_events, :course_uuid
 
-    add_index :course_events, :has_been_processed
+    add_index :course_events, :has_been_bundled
 
-    add_index :course_events, [:has_been_processed, :course_uuid, :course_seqnum],
-                              name: 'index_ce_on_hbp_cu_csn'
+    add_index :course_events, [:has_been_bundled, :course_uuid, :course_seqnum],
+                              name: 'index_ce_on_hbb_cu_csn'
 
   end
 end

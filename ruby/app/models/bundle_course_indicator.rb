@@ -1,0 +1,2 @@
+class BundleCourseIndicator < ApplicationRecord
+end

@@ -1,0 +1,2 @@
+class BundleBucket < ApplicationRecord
+end
