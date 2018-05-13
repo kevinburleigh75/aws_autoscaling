@@ -147,25 +147,26 @@ module Event
 
         ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
 
-        sql_find_course_uuids = %Q{
-          SELECT course_uuid FROM course_buckets
-          WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-        }.gsub(/\n\s*/, ' ')
-
-        course_uuids = ActiveRecord::Base.connection.execute(sql_find_course_uuids).map{|row| row['course_uuid']}
-        puts "#{Time.now.utc.iso8601(6)} handling buckets #{bucket_lo}-#{bucket_hi} (#{course_uuids.count} courses)"
-
-        course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
-
-        sql_find_courses_needing_attention = %Q{
+        sql_find_course_uuids_needing_attention = %Q{
           SELECT * FROM bundle_course_indicators
-          WHERE has_been_processed = FALSE
-          AND   course_uuid IN ( #{course_uuid_values} )
-          ORDER BY created_at ASC
+          WHERE bundle_course_indicators.indicator_uuid IN (
+            SELECT zz.indicator_uuid FROM (
+              SELECT * FROM bundle_course_indicators
+              WHERE has_been_processed = FALSE
+              ORDER BY created_at ASC
+              LIMIT 1000
+            ) AS zz INNER JOIN (
+              SELECT * FROM course_buckets
+              WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+            ) AS yy
+            ON zz.course_uuid = yy.course_uuid
+          )
           LIMIT 100
         }.gsub(/\n\s*/, ' ')
 
-        bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_courses_needing_attention)
+        # puts "QUERY: #{sql_find_course_uuids_needing_attention}"
+
+        bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_course_uuids_needing_attention)
 
         bundle_course_indicators.each do |indicator|
           indicator.has_been_processed = true
