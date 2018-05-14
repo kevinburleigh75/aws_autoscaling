@@ -18,5 +18,8 @@ class CreateBundleCourseIndicators < ActiveRecord::Migration[5.1]
 
     add_index :bundle_course_indicators, [:has_been_processed, :course_uuid, :created_at],
                                          name: 'index_bcis_on_hbp_cu_ca'
+
+    add_index :bundle_course_indicators, [:created_at, :has_been_processed],
+                                         name: 'index_bcis_on_ca_hbp'
   end
 end

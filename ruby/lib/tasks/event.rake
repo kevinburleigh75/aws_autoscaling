@@ -46,7 +46,7 @@ module Event
       course_buckets = @course_uuids.map { |course_uuid|
         CourseBucket.new(
           course_uuid: course_uuid,
-          bucket_num:  Kernel.rand(720),
+          bucket_num:  Kernel.rand(100),
         )
       }
 
@@ -122,7 +122,7 @@ module Event
     end
 
     def do_work(protocol:)
-      Rails.logger.level = :info #unless protocol.modulo == 0
+      Rails.logger.level = :info unless protocol.modulo == 0
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
@@ -135,8 +135,8 @@ module Event
         ## Find the course uuids handled by this worker.
         ##
 
-        bucket_lo = (Rational(720) / protocol.count * protocol.modulo).floor
-        bucket_hi = (Rational(720) / protocol.count * (protocol.modulo+1)).floor - 1
+        bucket_lo = (Rational(100) / protocol.count * protocol.modulo).floor
+        bucket_hi = (Rational(100) / protocol.count * (protocol.modulo+1)).floor - 1
 
         sql_find_and_lock_bundle_buckets = %Q{
           SELECT 1 FROM bundle_buckets
@@ -147,16 +147,15 @@ module Event
 
         ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
 
-        sql_find_course_uuids_needing_attention = %Q{
+        sql_find_indicators_needing_attention = %Q{
           SELECT * FROM bundle_course_indicators
-          WHERE bundle_course_indicators.indicator_uuid IN (
+          WHERE indicator_uuid IN (
             SELECT zz.indicator_uuid FROM (
-              SELECT * FROM bundle_course_indicators
+              SELECT indicator_uuid,course_uuid FROM bundle_course_indicators
               WHERE has_been_processed = FALSE
-              ORDER BY created_at ASC
-              LIMIT 1000
+              LIMIT 100
             ) AS zz INNER JOIN (
-              SELECT * FROM course_buckets
+              SELECT course_uuid FROM course_buckets
               WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
             ) AS yy
             ON zz.course_uuid = yy.course_uuid
@@ -164,15 +163,15 @@ module Event
           LIMIT 100
         }.gsub(/\n\s*/, ' ')
 
-        # puts "QUERY: #{sql_find_course_uuids_needing_attention}"
+        # puts "QUERY: #{sql_find_indicators_needing_attention}"
 
-        bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_course_uuids_needing_attention)
+        bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_indicators_needing_attention)
 
         bundle_course_indicators.each do |indicator|
           indicator.has_been_processed = true
         end
 
-        course_uuids_needing_attention = bundle_course_indicators.map{|indicator| indicator.course_uuid}
+        course_uuids_needing_attention = bundle_course_indicators.map{|indicator| indicator.course_uuid}.uniq
 
         puts "#{Time.now.utc.iso8601(6)} #{course_uuids_needing_attention.count} courses need attention"
 
