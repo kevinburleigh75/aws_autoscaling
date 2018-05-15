@@ -156,30 +156,51 @@ module Event
 
         ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
 
+        # sql_find_course_events_needing_attention = %Q{
+        #   SELECT * FROM course_events
+        #   WHERE has_been_bundled = FALSE
+        #   AND   event_uuid IN (
+        #     SELECT xx.event_uuid FROM
+        #     ( SELECT event_uuid,course_uuid,course_seqnum FROM course_events
+        #       WHERE has_been_bundled = FALSE
+        #       ORDER BY course_seqnum ASC
+        #       LIMIT 3000
+        #     ) AS xx
+        #     INNER JOIN
+        #     ( SELECT course_uuid, last_bundled_seqnum from bundle_course_states
+        #     ) AS yy
+        #     ON  xx.course_uuid   = yy.course_uuid
+        #     AND xx.course_seqnum = yy.last_bundled_seqnum + 1
+        #     INNER JOIN
+        #     ( SELECT course_uuid FROM course_buckets
+        #       WHERE  bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+        #     ) AS zz
+        #     ON xx.course_uuid = zz.course_uuid
+        #   )
+        #   LIMIT 100
+        # }.gsub(/\n\s*/, ' ')
+
         sql_find_course_events_needing_attention = %Q{
           SELECT * FROM course_events
-          WHERE has_been_bundled = FALSE
-          AND   event_uuid IN (
-            SELECT xx.event_uuid FROM
-            ( SELECT event_uuid,course_uuid,course_seqnum FROM course_events
-              WHERE has_been_bundled = FALSE
-              LIMIT 100
+          WHERE event_uuid IN
+          ( SELECT xx.event_uuid FROM
+            ( ( SELECT * FROM course_events
+                WHERE has_been_bundled = FALSE
+              ) AS yy
+              INNER JOIN
+              bundle_course_states as bces
+              ON  yy.course_uuid   = bces.course_uuid
+              AND yy.course_seqnum = bces.last_bundled_seqnum + 1
+              INNER JOIN
+              course_buckets as cbs
+              ON yy.course_uuid = cbs.course_uuid
             ) AS xx
-            INNER JOIN
-            ( SELECT course_uuid, last_bundled_seqnum from bundle_course_states
-            ) AS yy
-            ON  xx.course_uuid   = yy.course_uuid
-            AND xx.course_seqnum = yy.last_bundled_seqnum + 1
-            INNER JOIN
-            ( SELECT course_uuid FROM course_buckets
-              WHERE  bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-            ) AS zz
-            ON xx.course_uuid = zz.course_uuid
+            WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+            LIMIT 100
           )
-          LIMIT 100
         }.gsub(/\n\s*/, ' ')
 
-        # puts "QUERY: #{sql_find_course_events_needing_attention}"
+        puts "QUERY: #{sql_find_course_events_needing_attention}"
 
         course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
 
