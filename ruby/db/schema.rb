@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180513071236) do
+ActiveRecord::Schema.define(version: 20180514221807) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -44,6 +44,15 @@ ActiveRecord::Schema.define(version: 20180513071236) do
     t.index ["created_at", "has_been_processed"], name: "index_bcis_on_ca_hbp"
     t.index ["has_been_processed", "course_uuid", "created_at"], name: "index_bcis_on_hbp_cu_ca"
     t.index ["indicator_uuid"], name: "index_bundle_course_indicators_on_indicator_uuid", unique: true
+  end
+
+  create_table "bundle_course_states", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "last_bundled_seqnum", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["course_uuid"], name: "index_bundle_course_states_on_course_uuid", unique: true
+    t.index ["last_bundled_seqnum", "course_uuid"], name: "index_bcss_on_lbs_cu"
   end
 
   create_table "course_buckets", force: :cascade do |t|
@@ -147,12 +156,9 @@ ActiveRecord::Schema.define(version: 20180513071236) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
-    t.index ["course_uuid", "has_been_bundled", "course_seqnum"], name: "index_ces_on_cu_hbb_csn"
-    t.index ["course_uuid"], name: "index_course_events_on_course_uuid"
-    t.index ["event_uuid", "has_been_bundled", "course_seqnum"], name: "index_ces_on_eu_hbb_csn"
     t.index ["event_uuid"], name: "index_course_events_on_event_uuid", unique: true
+    t.index ["has_been_bundled", "course_seqnum", "course_uuid"], name: "index_ce_on_hbb_csn_cu"
     t.index ["has_been_bundled", "course_uuid", "course_seqnum"], name: "index_ce_on_hbb_cu_csn"
-    t.index ["has_been_bundled"], name: "index_course_events_on_has_been_bundled"
   end
 
   create_table "health_check_events", force: :cascade do |t|

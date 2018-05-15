@@ -43,20 +43,29 @@ module Event
       freq_cumsums   = freqs.inject([]){|result, freq| result << (result.last || 0) + freq; result}
       @event_cutoffs = freq_cumsums.map{|value| value/freq_sum}
 
-      course_buckets = @course_uuids.map { |course_uuid|
+      course_buckets = @course_uuids.map{ |course_uuid|
         CourseBucket.new(
           course_uuid: course_uuid,
           bucket_num:  Kernel.rand(100),
         )
       }
 
+      course_states = @course_uuids.map{ |course_uuid|
+        BundleCourseState.new(
+          course_uuid:          course_uuid,
+          last_bundled_seqnum:  -1,
+        )
+      }
+
       CourseBucket.transaction(isolation: :read_committed) do
         CourseBucket.import course_buckets
+        BundleCourseState.import course_states
       end
     end
 
     def do_work(protocol:)
       Rails.logger.level = :info
+      # Rails.logger.level = :debug
 
       @counter += 1
       Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
@@ -147,43 +156,106 @@ module Event
 
         ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
 
-        sql_find_indicators_needing_attention = %Q{
-          SELECT * FROM bundle_course_indicators
-          WHERE indicator_uuid IN (
-            SELECT zz.indicator_uuid FROM (
-              SELECT indicator_uuid,course_uuid FROM bundle_course_indicators
-              WHERE has_been_processed = FALSE
+        sql_find_course_events_needing_attention = %Q{
+          SELECT * FROM course_events
+          WHERE has_been_bundled = FALSE
+          AND   event_uuid IN (
+            SELECT xx.event_uuid FROM
+            ( SELECT event_uuid,course_uuid,course_seqnum FROM course_events
+              WHERE has_been_bundled = FALSE
               LIMIT 100
-            ) AS zz INNER JOIN (
-              SELECT course_uuid FROM course_buckets
-              WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+            ) AS xx
+            INNER JOIN
+            ( SELECT course_uuid, last_bundled_seqnum from bundle_course_states
             ) AS yy
-            ON zz.course_uuid = yy.course_uuid
+            ON  xx.course_uuid   = yy.course_uuid
+            AND xx.course_seqnum = yy.last_bundled_seqnum + 1
+            INNER JOIN
+            ( SELECT course_uuid FROM course_buckets
+              WHERE  bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+            ) AS zz
+            ON xx.course_uuid = zz.course_uuid
           )
           LIMIT 100
         }.gsub(/\n\s*/, ' ')
 
-        # puts "QUERY: #{sql_find_indicators_needing_attention}"
+        # puts "QUERY: #{sql_find_course_events_needing_attention}"
 
-        bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_indicators_needing_attention)
+        course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
 
-        bundle_course_indicators.each do |indicator|
-          indicator.has_been_processed = true
+        # course_events_needing_attention.each{|event| puts event.inspect}
+        puts "#{course_events_needing_attention.count} events need attention in buckets #{bucket_lo} - #{bucket_hi}"
+
+        course_events_needing_attention.each do |event|
+          event.has_been_bundled = true
         end
 
-        course_uuids_needing_attention = bundle_course_indicators.map{|indicator| indicator.course_uuid}.uniq
+        bundle_course_states = BundleCourseState.where(course_uuid: course_events_needing_attention.map(&:course_uuid))
+                                                .to_a ## needed to keep import() happy below
 
-        puts "#{Time.now.utc.iso8601(6)} #{course_uuids_needing_attention.count} courses need attention"
+        bundle_course_states.each do |state|
+          state.last_bundled_seqnum += 1
+        end
 
-        if bundle_course_indicators.any?
-          BundleCourseIndicator.import(
-            bundle_course_indicators,
+        if course_events_needing_attention.any?
+          CourseEvent.import(
+            course_events_needing_attention,
             on_duplicate_key_update: {
-              conflict_target:  [:indicator_uuid],
-              columns:          BundleCourseIndicator.column_names - ['updated_at', 'created_at']
+              conflict_target:  [:event_uuid],
+              columns:          CourseEvent.column_names - ['updated_at', 'created_at']
+            }
+          )
+
+          BundleCourseState.import(
+            bundle_course_states.to_a,
+            on_duplicate_key_update: {
+              conflict_target:  [:course_uuid],
+              columns:          BundleCourseState.column_names - ['updated_at', 'created_at']
             }
           )
         end
+
+        # course_uuids_needing_attention =
+        #   ActiveRecord::Base.connection.execute(sql_find_course_uuids_needing_attention)
+        #                                .map{|row| row['course_uuid']}
+
+        # sql_find_indicators_needing_attention = %Q{
+        #   SELECT * FROM bundle_course_indicators
+        #   WHERE indicator_uuid IN (
+        #     SELECT zz.indicator_uuid FROM (
+        #       SELECT indicator_uuid,course_uuid FROM bundle_course_indicators
+        #       WHERE has_been_processed = FALSE
+        #       LIMIT 100
+        #     ) AS zz INNER JOIN (
+        #       SELECT course_uuid FROM course_buckets
+        #       WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+        #     ) AS yy
+        #     ON zz.course_uuid = yy.course_uuid
+        #   )
+        #   LIMIT 100
+        # }.gsub(/\n\s*/, ' ')
+
+        # # puts "QUERY: #{sql_find_indicators_needing_attention}"
+
+        # bundle_course_indicators = BundleCourseIndicator.find_by_sql(sql_find_indicators_needing_attention)
+
+        # bundle_course_indicators.each do |indicator|
+        #   indicator.has_been_processed = true
+        # end
+
+        # course_uuids_needing_attention = bundle_course_indicators.map{|indicator| indicator.course_uuid}.uniq
+
+        # puts "#{Time.now.utc.iso8601(6)} #{course_uuids_needing_attention.count} courses need attention"
+
+        # if bundle_course_indicators.any?
+        #   BundleCourseIndicator.import(
+        #     bundle_course_indicators,
+        #     on_duplicate_key_update: {
+        #       conflict_target:  [:indicator_uuid],
+        #       columns:          BundleCourseIndicator.column_names - ['updated_at', 'created_at']
+        #     }
+        #   )
+        # end
 
         # ##
         # ## Find the courses that need attention and have been waiting the longest.
