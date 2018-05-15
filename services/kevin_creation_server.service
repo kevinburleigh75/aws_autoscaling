@@ -7,7 +7,7 @@ Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu
 ExecStart=/bin/bash /home/ubuntu/primary_repo/services/run_creation.sh
-Restart=on-abnormal
+Restart=on-failure
 KillSignal=SIGINT
 TimeoutStopSec=5
 
