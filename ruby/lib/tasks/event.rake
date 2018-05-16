@@ -291,253 +291,253 @@ module Event
     end
   end
 
-  # class FetchWorker
-  #   def initialize(group_uuid:, client_name:)
-  #     @group_uuid  = group_uuid
-  #     @client_name = client_name
+  class FetchWorker
+    def initialize(group_uuid:, client_name:)
+      @group_uuid  = group_uuid
+      @client_name = client_name
 
-  #     @client_uuid = nil
+      @client_uuid = nil
 
-  #     @counter = 0
-  #   end
+      @counter = 0
+    end
 
-  #   def do_work(protocol:)
-  #     Rails.logger.level = :info #unless modulo == 0
+    def do_work(protocol:)
+      # Rails.logger.level = :info #unless modulo == 0
 
-  #     ##
-  #     ## If @client_uuid has not been set, try to set it.
-  #     ##
+      # ##
+      # ## If @client_uuid has not been set, try to set it.
+      # ##
 
-  #     unless @client_uuid
-  #       ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-  #         sql_find_clients = %Q{
-  #           SELECT * FROM course_clients
-  #           WHERE name = '#{@client_name}'
-  #         }.gsub(/\n\s*/, ' ')
+      # unless @client_uuid
+      #   ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+      #     sql_find_clients = %Q{
+      #       SELECT * FROM course_clients
+      #       WHERE name = '#{@client_name}'
+      #     }.gsub(/\n\s*/, ' ')
 
-  #         client = CourseClient.find_by_sql(sql_find_clients).first
-  #         return if client.nil?
+      #     client = CourseClient.find_by_sql(sql_find_clients).first
+      #     return if client.nil?
 
-  #         @client_uuid = client.uuid
-  #       end
-  #     end
+      #     @client_uuid = client.uuid
+      #   end
+      # end
 
-  #     @counter += 1
-  #     Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
+      # @counter += 1
+      # Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
-  #     start = Time.now
+      # start = Time.now
 
-  #     puts "#{Time.now.utc.iso8601(6)} starting transaction"
-  #     num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-  #       current_time = Time.now
+      # puts "#{Time.now.utc.iso8601(6)} starting transaction"
+      # num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+      #   current_time = Time.now
 
-  #       ##
-  #       ## Find and lock the client states needing attention.
-  #       ##
+      #   ##
+      #   ## Find and lock the client states needing attention.
+      #   ##
 
-  #       sql_find_and_lock_course_client_states = %Q{
-  #         SELECT * FROM course_client_states
-  #         WHERE course_uuid IN (
-  #           SELECT course_uuid FROM course_client_states
-  #           WHERE needs_attention = TRUE
-  #           AND   client_uuid = '#{@client_uuid}'
-  #           AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
-  #           ORDER BY waiting_since ASC
-  #           LIMIT 10
-  #         )
-  #         AND client_uuid = '#{@client_uuid}'
-  #         ORDER BY course_uuid ASC
-  #         FOR UPDATE
-  #       }.gsub(/\n\s*/, ' ')
+      #   sql_find_and_lock_course_client_states = %Q{
+      #     SELECT * FROM course_client_states
+      #     WHERE course_uuid IN (
+      #       SELECT course_uuid FROM course_client_states
+      #       WHERE needs_attention = TRUE
+      #       AND   client_uuid = '#{@client_uuid}'
+      #       AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
+      #       ORDER BY waiting_since ASC
+      #       LIMIT 10
+      #     )
+      #     AND client_uuid = '#{@client_uuid}'
+      #     ORDER BY course_uuid ASC
+      #     FOR UPDATE
+      #   }.gsub(/\n\s*/, ' ')
 
-  #       course_client_states = CourseClientState.find_by_sql(sql_find_and_lock_course_client_states)
-  #       puts "#{Time.now.utc.iso8601(6)} #{course_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
-  #       next 0 if course_client_states.none?
+      #   course_client_states = CourseClientState.find_by_sql(sql_find_and_lock_course_client_states)
+      #   puts "#{Time.now.utc.iso8601(6)} #{course_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
+      #   next 0 if course_client_states.none?
 
-  #       course_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
+      #   course_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
 
-  #       ##
-  #       ## For each state (course) of interest, find the next bundle for this client.
-  #       ##
+      #   ##
+      #   ## For each state (course) of interest, find the next bundle for this client.
+      #   ##
 
-  #       course_uuids       = course_client_states.map(&:course_uuid).sort
-  #       course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+      #   course_uuids       = course_client_states.map(&:course_uuid).sort
+      #   course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-  #       sql_find_course_bundles = %Q{
-  #         SELECT * FROM course_bundles
-  #         WHERE uuid IN (
-  #           SELECT xx.uuid FROM (
-  #             SELECT * FROM course_client_states
-  #             WHERE course_uuid IN ( #{course_uuid_values} )
-  #             AND   client_uuid = '#{@client_uuid}'
-  #           ) client_states_oi
-  #           LEFT JOIN LATERAL (
-  #             SELECT * FROM course_bundles
-  #             WHERE course_uuid = client_states_oi.course_uuid
-  #             AND course_event_seqnum_hi > client_states_oi.last_confirmed_course_seqnum
-  #             ORDER BY course_event_seqnum_hi ASC
-  #             LIMIT 2
-  #           ) xx ON TRUE
-  #         )
-  #       }.gsub(/\n\s*/, ' ')
+      #   sql_find_course_bundles = %Q{
+      #     SELECT * FROM course_bundles
+      #     WHERE uuid IN (
+      #       SELECT xx.uuid FROM (
+      #         SELECT * FROM course_client_states
+      #         WHERE course_uuid IN ( #{course_uuid_values} )
+      #         AND   client_uuid = '#{@client_uuid}'
+      #       ) client_states_oi
+      #       LEFT JOIN LATERAL (
+      #         SELECT * FROM course_bundles
+      #         WHERE course_uuid = client_states_oi.course_uuid
+      #         AND course_event_seqnum_hi > client_states_oi.last_confirmed_course_seqnum
+      #         ORDER BY course_event_seqnum_hi ASC
+      #         LIMIT 2
+      #       ) xx ON TRUE
+      #     )
+      #   }.gsub(/\n\s*/, ' ')
 
-  #       course_bundles = CourseBundle.find_by_sql(sql_find_course_bundles)
-  #       puts "#{Time.now.utc.iso8601(6)} found #{course_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
+      #   course_bundles = CourseBundle.find_by_sql(sql_find_course_bundles)
+      #   puts "#{Time.now.utc.iso8601(6)} found #{course_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
 
-  #       num_processed_events = 0
-  #       if course_bundles.any?
-  #         ##
-  #         ## Find the events associated with the bundles.
-  #         ##
+      #   num_processed_events = 0
+      #   if course_bundles.any?
+      #     ##
+      #     ## Find the events associated with the bundles.
+      #     ##
 
-  #         bundle_uuids       = course_bundles.map(&:uuid).sort
-  #         bundle_uuid_values = bundle_uuids.map{|uuid| "'#{uuid}'"}.join(',')
+      #     bundle_uuids       = course_bundles.map(&:uuid).sort
+      #     bundle_uuid_values = bundle_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-  #         sql_find_course_events = %Q{
-  #           SELECT * FROM course_events
-  #           WHERE event_uuid IN (
-  #             SELECT course_event_uuid FROM course_bundle_entries
-  #             WHERE course_bundle_uuid in ( #{bundle_uuid_values} )
-  #           )
-  #         }.gsub(/\n\s*/, ' ')
+      #     sql_find_course_events = %Q{
+      #       SELECT * FROM course_events
+      #       WHERE event_uuid IN (
+      #         SELECT course_event_uuid FROM course_bundle_entries
+      #         WHERE course_bundle_uuid in ( #{bundle_uuid_values} )
+      #       )
+      #     }.gsub(/\n\s*/, ' ')
 
-  #         course_events = CourseEvent.find_by_sql(sql_find_course_events)
-  #                                    .select{ |event|
-  #                                      last_confirmed_course_seqnum = course_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
-  #                                      event.course_seqnum > last_confirmed_course_seqnum
-  #                                     }
+      #     course_events = CourseEvent.find_by_sql(sql_find_course_events)
+      #                                .select{ |event|
+      #                                  last_confirmed_course_seqnum = course_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
+      #                                  event.course_seqnum > last_confirmed_course_seqnum
+      #                                 }
 
-  #         puts "#{Time.now.utc.iso8601(6)} found #{course_events.count} course events"
+      #     puts "#{Time.now.utc.iso8601(6)} found #{course_events.count} course events"
 
-  #         now = Time.now
+      #     now = Time.now
 
-  #         course_events.group_by{ |event|
-  #           event.course_uuid
-  #         }.each{ |course_uuid, events|
-  #           puts "events for course #{course_uuid}:"
-  #           events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
-  #         }
+      #     course_events.group_by{ |event|
+      #       event.course_uuid
+      #     }.each{ |course_uuid, events|
+      #       puts "events for course #{course_uuid}:"
+      #       events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
+      #     }
 
-  #         delays = course_events.group_by{ |event|
-  #           event.course_uuid
-  #         }.map{ |course_uuid, events|
-  #           dels = events.map(&:created_at).map{|ca| now - ca}
-  #           [dels.min, dels.max]
-  #         }
-  #         min_delay = delays.map{|dd| dd[0]}.min
-  #         max_delay = delays.map{|dd| dd[1]}.max
-  #         puts "#{Time.now.utc.iso8601(6)} min,max delay = %+1.3e,%1.3e" % [min_delay, max_delay]
+      #     delays = course_events.group_by{ |event|
+      #       event.course_uuid
+      #     }.map{ |course_uuid, events|
+      #       dels = events.map(&:created_at).map{|ca| now - ca}
+      #       [dels.min, dels.max]
+      #     }
+      #     min_delay = delays.map{|dd| dd[0]}.min
+      #     max_delay = delays.map{|dd| dd[1]}.max
+      #     puts "#{Time.now.utc.iso8601(6)} min,max delay = %+1.3e,%1.3e" % [min_delay, max_delay]
 
-  #         num_processed_events = course_events.count
-  #       end
+      #     num_processed_events = course_events.count
+      #   end
 
-  #       puts "#{Time.now.utc.iso8601(6)} finished processing course bundles"
+      #   puts "#{Time.now.utc.iso8601(6)} finished processing course bundles"
 
-  #       ##
-  #       ## Update client states.
-  #       ##
+      #   ##
+      #   ## Update client states.
+      #   ##
 
-  #       course_client_states.each do |client_state|
-  #         puts "#{Time.now.utc.iso8601(6)} updating client state for course #{client_state.course_uuid}"
+      #   course_client_states.each do |client_state|
+      #     puts "#{Time.now.utc.iso8601(6)} updating client state for course #{client_state.course_uuid}"
 
-  #         bundles = course_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
-  #                                 .sort_by{|bundle| bundle.course_event_seqnum_hi}
+      #     bundles = course_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
+      #                             .sort_by{|bundle| bundle.course_event_seqnum_hi}
 
-  #         puts "#{Time.now.utc.iso8601(6)}   #{bundles.count} bundles"
+      #     puts "#{Time.now.utc.iso8601(6)}   #{bundles.count} bundles"
 
-  #         client_state.waiting_since   = current_time
-  #         client_state.needs_attention = (bundles.count > 1) ## FOR DEMO PURPOSES ONLY
-  #         if bundles.any?
-  #           puts "#{Time.now.utc.iso8601(6)}   bundles[0] course_event_seqnum_hi = #{bundles[0].course_event_seqnum_hi}"
-  #           client_state.last_confirmed_course_seqnum = bundles[0].course_event_seqnum_hi ## FOR DEMO PURPOSES ONLY
-  #         end
-  #       end
+      #     client_state.waiting_since   = current_time
+      #     client_state.needs_attention = (bundles.count > 1) ## FOR DEMO PURPOSES ONLY
+      #     if bundles.any?
+      #       puts "#{Time.now.utc.iso8601(6)}   bundles[0] course_event_seqnum_hi = #{bundles[0].course_event_seqnum_hi}"
+      #       client_state.last_confirmed_course_seqnum = bundles[0].course_event_seqnum_hi ## FOR DEMO PURPOSES ONLY
+      #     end
+      #   end
 
-  #       CourseClientState.import(
-  #         course_client_states,
-  #         on_duplicate_key_update: {
-  #           conflict_target: [:course_uuid, :client_uuid],
-  #           columns:         CourseClientState.column_names - ['updated_at', 'created_at']
-  #         }
-  #       )
+      #   CourseClientState.import(
+      #     course_client_states,
+      #     on_duplicate_key_update: {
+      #       conflict_target: [:course_uuid, :client_uuid],
+      #       columns:         CourseClientState.column_names - ['updated_at', 'created_at']
+      #     }
+      #   )
 
-  #       puts "#{Time.now.utc.iso8601(6)} finished processing client states"
+      #   puts "#{Time.now.utc.iso8601(6)} finished processing client states"
 
-  #       num_processed_events
-  #     end
-  #     elapsed = Time.now - start
+      #   num_processed_events
+      # end
+      # elapsed = Time.now - start
 
-  #     puts "#{Time.now.utc.iso8601(6)} finished transaction elapsed = #{'%1.3e' % elapsed}"
-  #     Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
-  #   end
+      # puts "#{Time.now.utc.iso8601(6)} finished transaction elapsed = #{'%1.3e' % elapsed}"
+      # Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
+    end
 
-  #   def do_boss(protocol:)
-  #     Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
+    def do_boss(protocol:)
+      # Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}]   doing boss stuff..."
 
-  #     start = Time.now
+      # start = Time.now
 
-  #     ##
-  #     ## Add an entry to the course stream's client table, if needed.
-  #     ##
+      # ##
+      # ## Add an entry to the course stream's client table, if needed.
+      # ##
 
-  #     unless @client_uuid
-  #       client = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-  #         sql_find_clients = %Q{
-  #           SELECT * FROM course_clients
-  #           WHERE name = '#{@client_name}'
-  #         }.gsub(/\n\s*/, ' ')
+      # unless @client_uuid
+      #   client = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+      #     sql_find_clients = %Q{
+      #       SELECT * FROM course_clients
+      #       WHERE name = '#{@client_name}'
+      #     }.gsub(/\n\s*/, ' ')
 
-  #         client = CourseClient.find_by_sql(sql_find_clients).first
-  #         if client.nil?
-  #           client = CourseClient.new(
-  #             uuid: SecureRandom.uuid.to_s,
-  #             name: @client_name,
-  #           )
-  #           client.save!
-  #         end
+      #     client = CourseClient.find_by_sql(sql_find_clients).first
+      #     if client.nil?
+      #       client = CourseClient.new(
+      #         uuid: SecureRandom.uuid.to_s,
+      #         name: @client_name,
+      #       )
+      #       client.save!
+      #     end
 
-  #         client
-  #       end
+      #     client
+      #   end
 
-  #       @client_uuid = client.uuid
-  #     end
+      #   @client_uuid = client.uuid
+      # end
 
-  #     ##
-  #     ## Create client states for any missing courses.
-  #     ##
+      # ##
+      # ## Create client states for any missing courses.
+      # ##
 
-  #     puts "#{Time.now.utc.iso8601(6)} starting course check transaction"
-  #     ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-  #       sql_find_course_event_states = %Q{
-  #         SELECT * FROM course_event_states
-  #         WHERE course_uuid NOT IN (
-  #           SELECT course_uuid FROM course_client_states
-  #           WHERE client_uuid = '#{@client_uuid}'
-  #         )
-  #       }.gsub(/\n\s*/, ' ')
+      # puts "#{Time.now.utc.iso8601(6)} starting course check transaction"
+      # ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+      #   sql_find_course_event_states = %Q{
+      #     SELECT * FROM course_event_states
+      #     WHERE course_uuid NOT IN (
+      #       SELECT course_uuid FROM course_client_states
+      #       WHERE client_uuid = '#{@client_uuid}'
+      #     )
+      #   }.gsub(/\n\s*/, ' ')
 
-  #       course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
+      #   course_event_states = CourseEventState.find_by_sql(sql_find_course_event_states)
 
-  #       puts "adding #{course_event_states.count} course client states"
+      #   puts "adding #{course_event_states.count} course client states"
 
-  #       current_time = Time.now
+      #   current_time = Time.now
 
-  #       client_states = course_event_states.map{ |client_state|
-  #         CourseClientState.new(
-  #           client_uuid:                  @client_uuid,
-  #           course_uuid:                  client_state.course_uuid,
-  #           last_confirmed_course_seqnum: -1,
-  #           needs_attention:              true,
-  #           waiting_since:                current_time,
-  #         )
-  #       }
+      #   client_states = course_event_states.map{ |client_state|
+      #     CourseClientState.new(
+      #       client_uuid:                  @client_uuid,
+      #       course_uuid:                  client_state.course_uuid,
+      #       last_confirmed_course_seqnum: -1,
+      #       needs_attention:              true,
+      #       waiting_since:                current_time,
+      #     )
+      #   }
 
-  #       CourseClientState.import client_states
-  #     end
-  #     elapsed = Time.now - start
-  #     puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
-  #   end
-  # end
+      #   CourseClientState.import client_states
+      # end
+      # elapsed = Time.now - start
+      # puts "#{Time.now.utc.iso8601(6)} finished course check transaction elapsed = #{'%1.3e' % elapsed}"
+    end
+  end
 
 end
 
@@ -609,36 +609,36 @@ namespace :event do
   end
 end
 
-# namespace :event do
-#   desc 'fetch events'
-#   task :fetch, [:group_uuid, :work_interval, :work_modulo, :work_offset, :client_name] => :environment do |t, args|
-#     group_uuid          = args[:group_uuid]
-#     work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
-#     boss_interval       = 1.0.seconds #Rails.env.production? ? 30.seconds : 5.seconds
-#     work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
-#     work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
-#     client_name         = args[:client_name]
+namespace :event do
+  desc 'fetch events'
+  task :fetch, [:group_uuid, :work_interval, :work_modulo, :work_offset, :client_name] => :environment do |t, args|
+    group_uuid          = args[:group_uuid]
+    work_interval       = (args[:work_interval]       || '1.0').to_f.seconds
+    boss_interval       = 1.0.seconds #Rails.env.production? ? 30.seconds : 5.seconds
+    work_modulo         = (args[:work_modulo]         || '1.0').to_f.seconds
+    work_offset         = (args[:work_offset]         || '0.0').to_f.seconds
+    client_name         = args[:client_name]
 
-#     worker = Event::FetchWorker.new(
-#       group_uuid:   group_uuid,
-#       client_name:  client_name,
-#     )
+    worker = Event::FetchWorker.new(
+      group_uuid:   group_uuid,
+      client_name:  client_name,
+    )
 
-#     protocol = Protocol.new(
-#       min_work_interval:   work_interval,
-#       min_boss_interval:   boss_interval,
-#       timing_modulo:       work_modulo,
-#       timing_offset:       work_offset,
-#       group_uuid:          group_uuid,
-#       group_desc:          'fetchers',
-#       instance_uuid:       SecureRandom.uuid.to_s,
-#       instance_desc:       Process.pid.to_s,
-#       work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
-#       boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
-#       reference_time:      Chronic.parse('Jan 1, 2000 12:00:00.003 pm'),
-#       dead_record_timeout: 10.seconds,
-#     )
+    protocol = Protocol.new(
+      min_work_interval:   work_interval,
+      min_boss_interval:   boss_interval,
+      timing_modulo:       work_modulo,
+      timing_offset:       work_offset,
+      group_uuid:          group_uuid,
+      group_desc:          'fetchers',
+      instance_uuid:       SecureRandom.uuid.to_s,
+      instance_desc:       Process.pid.to_s,
+      work_block:          lambda { |protocol:| worker.do_work(protocol: protocol) },
+      boss_block:          lambda { |protocol:| worker.do_boss(protocol: protocol) },
+      reference_time:      Chronic.parse('Jan 1, 2000 12:00:00.003 pm'),
+      dead_record_timeout: 10.seconds,
+    )
 
-#     protocol.run
-#   end
-# end
+    protocol.run
+  end
+end
