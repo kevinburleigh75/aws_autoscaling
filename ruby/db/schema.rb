@@ -133,32 +133,18 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.index ["uuid"], name: "index_course_clients_on_uuid", unique: true
   end
 
-  create_table "course_event_states", force: :cascade do |t|
-    t.uuid "course_uuid", null: false
-    t.integer "last_course_seqnum", null: false
-    t.boolean "needs_attention", null: false
-    t.datetime "waiting_since", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["course_uuid"], name: "index_course_event_states_on_course_uuid", unique: true
-    t.index ["needs_attention", "waiting_since"], name: "index_course_event_states_on_needs_attention_and_waiting_since"
-    t.index ["needs_attention"], name: "index_course_event_states_on_needs_attention"
-    t.index ["waiting_since"], name: "index_course_event_states_on_waiting_since"
-  end
-
   create_table "course_events", force: :cascade do |t|
     t.uuid "course_uuid", null: false
     t.integer "course_seqnum", null: false
     t.string "event_type", null: false
     t.uuid "event_uuid", null: false
     t.datetime "event_time", null: false
-    t.boolean "has_been_bundled", null: false
+    t.uuid "bundle_uuid"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.index ["bundle_uuid", "course_uuid", "course_seqnum"], name: "index_ce_on_bu_cu_csn"
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
     t.index ["event_uuid"], name: "index_course_events_on_event_uuid", unique: true
-    t.index ["has_been_bundled", "course_seqnum", "course_uuid"], name: "index_ce_on_hbb_csn_cu"
-    t.index ["has_been_bundled", "course_uuid", "course_seqnum"], name: "index_ce_on_hbb_cu_csn"
   end
 
   create_table "health_check_events", force: :cascade do |t|

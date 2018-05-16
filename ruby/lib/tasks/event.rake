@@ -90,24 +90,23 @@ module Event
           event_type:         event_type,
           event_uuid:         SecureRandom.uuid.to_s,
           event_time:         Time.now,
-          has_been_bundled:   false,
         )
       }
 
-      course_uuids = course_events.map(&:course_uuid).uniq.sort
+      # course_uuids = course_events.map(&:course_uuid).uniq.sort
 
-      bundle_course_indicators = course_uuids.map{ |course_uuid|
-        BundleCourseIndicator.new(
-          indicator_uuid:     SecureRandom.uuid.to_s,
-          course_uuid:        course_uuid,
-          source:             'event',
-          has_been_processed: false,
-        )
-      }
+      # bundle_course_indicators = course_uuids.map{ |course_uuid|
+      #   BundleCourseIndicator.new(
+      #     indicator_uuid:     SecureRandom.uuid.to_s,
+      #     course_uuid:        course_uuid,
+      #     source:             'event',
+      #     has_been_processed: false,
+      #   )
+      # }
 
       CourseEvent.transaction(isolation: :read_committed) do
         CourseEvent.import course_events
-        BundleCourseIndicator.import bundle_course_indicators
+        # BundleCourseIndicator.import bundle_course_indicators
       end
 
       elapsed = Time.now - start
@@ -157,7 +156,6 @@ module Event
 
         ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
 
-
         ##
         ## Find relavent events that are bundle-able.
         ##
@@ -167,7 +165,7 @@ module Event
           WHERE event_uuid IN
           ( SELECT xx.event_uuid FROM
             ( ( SELECT * FROM course_events
-                WHERE has_been_bundled = FALSE
+                WHERE bundle_uuid IS NULL
               ) AS yy
               INNER JOIN
               bundle_course_states as bces
@@ -180,7 +178,6 @@ module Event
             WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
             LIMIT 50
           )
-          FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
         puts "QUERY: #{sql_find_course_events_needing_attention}"
@@ -197,10 +194,6 @@ module Event
         bundle_course_states = BundleCourseState.where(course_uuid: course_events_needing_attention.map(&:course_uuid))
                                                 .to_a ## needed to keep import() happy below
 
-        course_events_needing_attention.each do |event|
-          event.has_been_bundled = true
-        end
-
         bundle_course_states.each do |state|
           state.last_bundled_seqnum += 1
         end
@@ -210,7 +203,6 @@ module Event
           WHERE is_open = TRUE
           AND course_uuid IN ( #{course_uuid_values} )
           ORDER BY uuid ASC
-          FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
         existing_course_bundles  = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
@@ -249,6 +241,8 @@ module Event
             target_course_open_bundle.size                   += target_event_size
           end
 
+          target_course_event.bundle_uuid = target_course_open_bundle.course_uuid
+
           if ( (target_course_open_bundle.size >= @max_bundle_size) ||
                (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
             target_course_open_bundle.is_open = false
@@ -256,15 +250,6 @@ module Event
 
           target_course_open_bundle.has_been_processed = false
           target_course_open_bundle.waiting_since      = Time.now
-
-          ##
-          ## Create a bundle entry for the course event stream.
-          ##
-
-          bundle_entries_to_create << CourseBundleEntry.new(
-            course_event_uuid:  target_course_event.event_uuid,
-            course_bundle_uuid: target_course_open_bundle.uuid,
-          )
         end
 
         if course_events_needing_attention.any?
@@ -291,218 +276,7 @@ module Event
               columns:         CourseBundle.column_names - ['updated_at', 'created_at']
             }
           )
-
-          CourseBundleEntry.import bundle_entries_to_create
         end
-
-        # ##
-        # ## Process the course events, grouped by course
-        # ##
-
-        # bundles_to_create           = []
-        # bundle_entries_to_create    = []
-        # events_to_update            = []
-
-        # activity_by_course_uuid = course_event_states.inject({}){ |result, event_state|
-        #   result[event_state.course_uuid] = {
-        #     activity:               false,
-        #     num_events_added:       0,
-        #     gap_found:              false,
-        #     new_last_course_seqnum: -1,
-        #   }
-        #   result
-        # }
-
-        # course_events.group_by{|event| event.course_uuid}.each do |target_course_uuid, target_course_events|
-        #   puts "#{Time.now.utc.iso8601(6)}  processing course #{target_course_uuid}"
-
-        #   target_course_events = target_course_events.sort_by{|event| event.course_seqnum}
-
-        #   puts "#{Time.now.utc.iso8601(6)}    #{target_course_events.count} course events:"
-        #   target_course_events.each{|ee| puts "#{Time.now.utc.iso8601(6)}      event #{ee.event_uuid} seqnum #{ee.course_seqnum}"}
-
-        #   target_course_event_state = course_event_states.detect{|es| es.course_uuid == target_course_uuid}
-        #   target_course_open_bundle = existing_course_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
-        #   gap_found                 = false
-        #   new_last_course_seqnum    = target_course_event_state.last_course_seqnum
-
-        #   target_course_events.each do |event|
-        #     puts "#{Time.now.utc.iso8601(6)}    processing event #{event.event_uuid} seqnum #{event.course_seqnum}"
-
-        #     ##
-        #     ## If the event causes a gap, stop processing events for the target course.
-        #     ##
-
-        #     if event.course_seqnum != new_last_course_seqnum + 1
-        #       puts "#{Time.now.utc.iso8601(6)}      gap found"
-        #       gap_found = true
-        #       activity_by_course_uuid[target_course_uuid][:gap_found] = true
-        #       break
-        #     end
-
-        #     event.has_been_processed = true
-        #     events_to_update << event
-
-        #     activity_by_course_uuid[target_course_uuid][:activity]          = true
-        #     activity_by_course_uuid[target_course_uuid][:num_events_added] += 1
-
-        #     ##
-        #     ## Add the event to the currently open bundle, if possible.
-        #     ## If not, close the old bundle and/or create a new bundle for it.
-        #     ##
-
-        #     new_last_course_seqnum += 1
-
-        #     event_size = Event::event_data_by_type[event.event_type.to_sym][:size]
-
-        #     if target_course_open_bundle &&
-        #        ( (target_course_open_bundle.size + event_size > @max_bundle_size) ||
-        #          (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-        #       target_course_open_bundle.is_open = false
-        #       target_course_open_bundle         = nil
-        #     end
-
-        #     if target_course_open_bundle.nil?
-        #       puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
-        #       target_course_open_bundle = CourseBundle.new(
-        #         uuid:                   SecureRandom.uuid.to_s,
-        #         course_uuid:            event.course_uuid,
-        #         course_event_seqnum_lo: event.course_seqnum,
-        #         course_event_seqnum_hi: event.course_seqnum,
-        #         size:                   event_size,
-        #         is_open:                true,
-        #         has_been_processed:     false,
-        #         waiting_since:          Time.now,
-        #       )
-        #       bundles_to_create << target_course_open_bundle
-        #     else
-        #       puts "#{Time.now.utc.iso8601(6)}      adding to existing bundle"
-        #       target_course_open_bundle.course_event_seqnum_hi  = event.course_seqnum
-        #       target_course_open_bundle.size                   += event_size
-        #     end
-
-        #     if ( (target_course_open_bundle.size >= @max_bundle_size) ||
-        #          (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-        #       target_course_open_bundle.is_open = false
-        #     end
-
-        #     target_course_open_bundle.has_been_processed = false
-        #     target_course_open_bundle.waiting_since      = Time.now
-
-        #     ##
-        #     ## Create a bundle entry for the course event stream.
-        #     ##
-
-        #     bundle_entries_to_create << CourseBundleEntry.new(
-        #       course_event_uuid:  event.event_uuid,
-        #       course_bundle_uuid: target_course_open_bundle.uuid,
-        #     )
-
-        #     ##
-        #     ## Update the course bundle state.
-        #     ##
-
-        #     target_bundle_state = bundle_states.detect{|bs| bs.course_uuid == target_course_uuid}
-
-        #     if !target_bundle_state.needs_attention
-        #       target_bundle_state.needs_attention = true
-        #       target_bundle_state.waiting_since   = Time.now
-        #     end
-        #   end ## end of per-event processing
-
-        #   activity_by_course_uuid[target_course_uuid][:new_last_course_seqnum] = new_last_course_seqnum
-        # end ## end of per-course processing
-
-        # ##
-        # ## Update the course event and client states.
-        # ##
-
-        # course_event_states.each do |event_state|
-        #   target_course_uuid = event_state.course_uuid
-
-        #   puts "#{Time.now.utc.iso8601(6)}  updating event states for course #{target_course_uuid}"
-
-        #   if activity_by_course_uuid[target_course_uuid][:num_events_added] < max_events_per_course
-        #     puts "#{Time.now.utc.iso8601(6)}    course events do not need further attention"
-        #     event_state.needs_attention = false
-        #   else
-        #     puts "#{Time.now.utc.iso8601(6)}    course events need further attention"
-        #   end
-
-        #   puts "#{Time.now.utc.iso8601(6)}  updating client states for course #{target_course_uuid}"
-
-        #   if activity_by_course_uuid[target_course_uuid][:activity]
-        #     event_state.last_course_seqnum = activity_by_course_uuid[target_course_uuid][:new_last_course_seqnum]
-        #     event_state.waiting_since      = Time.now
-
-        #     puts "#{Time.now.utc.iso8601(6)}    there was course activity"
-
-        #     target_client_states = client_states.select{|cs| cs.course_uuid == target_course_uuid}
-        #     puts "#{Time.now.utc.iso8601(6)}      #{target_client_states.count} clients found"
-
-        #     target_client_states.each do |client_state|
-        #       if !client_state.needs_attention
-        #         puts "#{Time.now.utc.iso8601(6)}        client #{client_state.client_uuid} now needs attention"
-        #         client_state.needs_attention = true
-        #         client_state.waiting_since   = Time.now
-        #       else
-        #         puts "#{Time.now.utc.iso8601(6)}        client #{client_state.client_uuid} already needs attention"
-        #       end
-        #     end
-        #   else
-        #     puts "#{Time.now.utc.iso8601(6)}    there was no course activity"
-        #   end
-        # end
-
-        # ##
-        # ## Do bulk creates/updates
-        # ##
-
-        # CourseBundleEntry.import bundle_entries_to_create
-
-        # CourseBundle.import bundles_to_create
-        # CourseBundle.import(
-        #   existing_course_bundles,
-        #   on_duplicate_key_update: {
-        #     conflict_target:  [:uuid],
-        #     columns:          CourseBundle.column_names - ['updated_at', 'created_at']
-        #   }
-        # )
-
-
-        # CourseBundleState.import(
-        #   bundle_states,
-        #   on_duplicate_key_update: {
-        #     conflict_target:  [:course_uuid],
-        #     columns:          CourseBundleState.column_names - ['updated_at', 'created_at']
-        #   }
-        # )
-
-        # CourseEvent.import(
-        #   course_events,
-        #   on_duplicate_key_update: {
-        #     conflict_target:  [:event_uuid],
-        #     columns:          CourseEvent.column_names - ['updated_at', 'created_at']
-        #   }
-        # )
-
-        # CourseEventState.import(
-        #   course_event_states,
-        #   on_duplicate_key_update: {
-        #     conflict_target:  [:course_uuid],
-        #     columns:          CourseEventState.column_names - ['updated_at', 'created_at']
-        #   }
-        # )
-
-        # CourseClientState.import(
-        #   client_states,
-        #   on_duplicate_key_update: {
-        #     conflict_target:  [:client_uuid, :course_uuid],
-        #     columns:          CourseClientState.column_names - ['updated_at', 'created_at']
-        #   }
-        # )
-
-        # course_events.size
       end
 
       elapsed = Time.now - start
