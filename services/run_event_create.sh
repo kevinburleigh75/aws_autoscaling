@@ -11,4 +11,4 @@ echo "running bundle install..."
 RAILS_ENV=production bundle install
 
 echo "running event create..."
-RAILS_ENV=production bundle exec rake event:create[4d0e84d6-60db-4756-9289-9fc4cdd12a58,0.1,1.0,0.0,10,1000]
+RAILS_ENV=production bundle exec rake event:create[4d0e84d6-60db-4756-9289-9fc4cdd12a58,0.1,1.0,0.0,30,1000]
