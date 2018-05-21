@@ -23,7 +23,7 @@ class Protocol
     @boss_block        = boss_block
     @min_work_interval = min_work_interval || @very_long_time
     @work_block        = work_block
-    @min_wake_interval = min_wake_interval || [0.25.seconds, dead_record_timeout / 3.0].min
+    @min_wake_interval = min_wake_interval || [1.seconds, dead_record_timeout / 3.14159].min
 
     @group_uuid          = group_uuid
     @group_desc          = group_desc
@@ -262,21 +262,11 @@ class Protocol
   end
 
   def compute_next_wake_time(current_time:)
-    @instance_record.next_wake_time = Protocol::Helpers.compute_next_time(
-      current_time:    current_time,
-      reference_time:  @reference_time,
-      timing_modulo:   @timing_modulo,
-      timing_offset:   @timing_offset,
-      instance_count:  @instance_record.instance_count,
-      instance_modulo: @instance_record.instance_modulo,
-      interval:        @min_wake_interval
-    )
-
     @instance_record.next_wake_time = [
       @instance_record.next_end_time,
       @instance_record.next_boss_time,
       @instance_record.next_work_time,
-      @instance_record.next_wake_time,
+      current_time + @min_wake_interval,
     ].compact.min
   end
 
