@@ -561,6 +561,7 @@ namespace :event do
     protocol = Protocol.new(
       min_work_interval:   work_interval,
       min_boss_interval:   boss_interval,
+      min_update_interval: 1.second,
       timing_modulo:       work_modulo,
       timing_offset:       work_offset,
       group_uuid:          group_uuid,
@@ -593,6 +594,7 @@ namespace :event do
     protocol = Protocol.new(
       min_work_interval:   work_interval,
       min_boss_interval:   boss_interval,
+      min_update_interval: 1.second,
       timing_modulo:       work_modulo,
       timing_offset:       work_offset,
       group_uuid:          group_uuid,
@@ -627,6 +629,7 @@ namespace :event do
     protocol = Protocol.new(
       min_work_interval:   work_interval,
       min_boss_interval:   boss_interval,
+      min_update_interval: 1.second,
       timing_modulo:       work_modulo,
       timing_offset:       work_offset,
       group_uuid:          group_uuid,
