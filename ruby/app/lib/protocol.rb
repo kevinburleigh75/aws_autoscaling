@@ -1,11 +1,11 @@
 class Protocol
-  def initialize(min_end_interval:  nil,
-                 end_block:         nil,
-                 min_boss_interval: nil,
-                 boss_block:        nil,
-                 min_work_interval: nil,
-                 work_block:        nil,
-                 min_wake_interval: nil,
+  def initialize(min_end_interval:    nil,
+                 end_block:           nil,
+                 min_boss_interval:   nil,
+                 boss_block:          nil,
+                 min_work_interval:   nil,
+                 work_block:          nil,
+                 min_update_interval: nil,
                  group_uuid:,
                  group_desc:,
                  instance_uuid:,
@@ -17,13 +17,13 @@ class Protocol
                  timing_offset:)
     @very_long_time = 600.seconds
 
-    @min_end_interval  = min_end_interval || @very_long_time
-    @end_block         = end_block
-    @min_boss_interval = min_boss_interval || @very_long_time
-    @boss_block        = boss_block
-    @min_work_interval = min_work_interval || @very_long_time
-    @work_block        = work_block
-    @min_wake_interval = min_wake_interval || [1.seconds, dead_record_timeout / 3.14159].min
+    @min_end_interval    = min_end_interval || @very_long_time
+    @end_block           = end_block
+    @min_boss_interval   = min_boss_interval || @very_long_time
+    @boss_block          = boss_block
+    @min_work_interval   = min_work_interval || @very_long_time
+    @work_block          = work_block
+    @min_update_interval = min_update_interval || [1.seconds, dead_record_timeout / 3.14159].min
 
     @group_uuid          = group_uuid
     @group_desc          = group_desc
@@ -34,6 +34,8 @@ class Protocol
     @reference_time      = reference_time
     @timing_modulo       = timing_modulo
     @timing_offset       = timing_offset
+
+    @next_wake_time = nil
 
     @core = Protocol::Core.new(world: self)
   end
@@ -80,6 +82,14 @@ class Protocol
     @instance_record.instance_modulo
   end
 
+  def has_group_records?
+    !(@group_records.nil? || @group_records.none?)
+  end
+
+  def clear_group_records
+    @group_records = []
+  end
+
   def read_group_records
     @group_records = Protocol::Helpers.read_group_records(group_uuid: @group_uuid)
   end
@@ -114,7 +124,9 @@ class Protocol
   end
 
   def align_with_boss
+    result = @instance_record.boss_uuid != @boss_record.instance_uuid
     @instance_record.boss_uuid = @boss_record.instance_uuid
+    return result
   end
 
   def update_boss_vote
@@ -146,6 +158,10 @@ class Protocol
 
   def has_next_work_time?
     return !@instance_record.next_work_time.nil?
+  end
+
+  def has_next_update_time?
+    return !@instance_record.next_update_time.nil?
   end
 
   def clear_next_boss_time
@@ -221,6 +237,29 @@ class Protocol
     end
   end
 
+  def compute_and_set_next_update_time(current_time:)
+    time_to_use =
+      if @instance_record.next_update_time.nil?
+        current_time
+      else
+        @instance_record.next_update_time + 1e-5.seconds
+      end
+
+    @instance_record.next_update_time = Protocol::Helpers.compute_next_time(
+      current_time:    time_to_use,
+      reference_time:  @reference_time,
+      timing_modulo:   @timing_modulo,
+      timing_offset:   @timing_offset,
+      instance_count:  @instance_record.instance_count,
+      instance_modulo: @instance_record.instance_modulo,
+      interval:        @min_update_interval
+    )
+
+    if @instance_record.next_update_time < current_time
+      @instance_record.next_update_time = current_time
+    end
+  end
+
   def destroy_dead_records
     Protocol::Helpers.destroy_dead_records(
       protocol:          self,
@@ -256,22 +295,27 @@ class Protocol
     @end_block.call(protocol: self) unless @end_block.nil?
   end
 
+  def is_time_for_update?(current_time:)
+    return false if @min_update_interval.nil? || @instance_record.next_update_time.nil?
+    return current_time > @instance_record.next_update_time
+  end
+
   def save_record
     @instance_record.instance_count = @live_records.count
     Protocol::Helpers.save_record(record: @instance_record)
   end
 
   def compute_next_wake_time(current_time:)
-    @instance_record.next_wake_time = [
+    @next_wake_time = [
       @instance_record.next_end_time,
       @instance_record.next_boss_time,
       @instance_record.next_work_time,
-      current_time + @min_wake_interval,
+      @instance_record.next_update_time,
     ].compact.min
   end
 
   def sleep_until_next_event
-    delay = [@instance_record.next_wake_time - Time.now, 0.001].max
+    delay = [@next_wake_time - Time.now, 0.001].max
     # puts "delay = #{delay}"
     sleep(delay)
   end

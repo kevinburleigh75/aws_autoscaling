@@ -170,11 +170,10 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.datetime "next_end_time"
     t.datetime "next_boss_time"
     t.datetime "next_work_time"
-    t.datetime "next_wake_time"
+    t.datetime "next_update_time"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["group_uuid", "instance_modulo"], name: "index_protocol_records_on_group_uuid_and_instance_modulo", unique: true
-    t.index ["group_uuid"], name: "index_protocol_records_on_group_uuid"
     t.index ["instance_uuid"], name: "index_protocol_records_on_instance_uuid", unique: true
   end
 

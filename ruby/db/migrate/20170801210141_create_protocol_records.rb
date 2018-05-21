@@ -14,17 +14,15 @@ class CreateProtocolRecords < ActiveRecord::Migration[5.1]
       t.timestamp :next_end_time
       t.timestamp :next_boss_time
       t.timestamp :next_work_time
-      t.timestamp :next_wake_time
+      t.timestamp :next_update_time
 
       t.timestamps                      null: false
     end
 
-    add_index  :protocol_records,  :group_uuid
+    add_index  :protocol_records, :instance_uuid,
+                                  unique: true
 
-    add_index  :protocol_records,  :instance_uuid,
-                                     unique: true
-
-    add_index  :protocol_records,  [:group_uuid, :instance_modulo],
-                                     unique: true
+    add_index  :protocol_records, [:group_uuid, :instance_modulo],
+                                  unique: true
   end
 end

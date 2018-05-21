@@ -56,7 +56,7 @@ namespace :protocol do
       group_desc:           'some group desc',
       instance_uuid:        SecureRandom.uuid.to_s,
       instance_desc:        ENV['ID'] || "%05d" % Kernel.rand(1000),
-      dead_record_timeout:  5.seconds,
+      dead_record_timeout:  1.seconds,
       dead_record_block:    lambda { |protocol:, record:|
                               worker.do_dead_record(protocol: protocol, record: record)
                             },

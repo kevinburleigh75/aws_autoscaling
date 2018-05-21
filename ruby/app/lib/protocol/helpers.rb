@@ -88,7 +88,7 @@
               next_end_time:       nil,
               next_boss_time:      nil,
               next_work_time:      nil,
-              next_wake_time:      nil,
+              next_update_time:    nil,
             )
           end
 
@@ -106,6 +106,7 @@
       ActiveRecord::Base.connection_pool.with_connection do
         record.updated_at = Time.now
         record.save!
+        # puts "#{Time.now.utc.iso8601(6)}: record saved"
       end
     end
 
@@ -169,6 +170,7 @@
         dead_record_block.call(protocol: protocol, record: record) unless dead_record_block.nil?
         record.destroy!
       end
+      dead_records.any?
     end
   end
 end
