@@ -93,20 +93,8 @@ module Event
         )
       }
 
-      # course_uuids = course_events.map(&:course_uuid).uniq.sort
-
-      # bundle_course_indicators = course_uuids.map{ |course_uuid|
-      #   BundleCourseIndicator.new(
-      #     indicator_uuid:     SecureRandom.uuid.to_s,
-      #     course_uuid:        course_uuid,
-      #     source:             'event',
-      #     has_been_processed: false,
-      #   )
-      # }
-
       CourseEvent.transaction(isolation: :read_committed) do
         CourseEvent.import course_events
-        # BundleCourseIndicator.import bundle_course_indicators
       end
 
       elapsed = Time.now - start
@@ -178,6 +166,7 @@ module Event
             WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
             LIMIT 50
           )
+          FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
         puts "QUERY: #{sql_find_course_events_needing_attention}"
@@ -191,8 +180,14 @@ module Event
         # course_events_needing_attention.each{|event| puts event.inspect}
         puts "#{course_events_needing_attention.count} events need attention in buckets #{bucket_lo} - #{bucket_hi}"
 
-        bundle_course_states = BundleCourseState.where(course_uuid: course_events_needing_attention.map(&:course_uuid))
-                                                .to_a ## needed to keep import() happy below
+        sql_find_and_lock_bundle_course_states = %Q{
+          SELECT * FROM bundle_course_states
+          WHERE course_uuid IN ( #{course_uuid_values} )
+          ORDER BY course_uuid ASC
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
+
+        bundle_course_states = BundleCourseState.find_by_sql(sql_find_and_lock_bundle_course_states)
 
         bundle_course_states.each do |state|
           state.last_bundled_seqnum += 1
@@ -203,6 +198,7 @@ module Event
           WHERE is_open = TRUE
           AND course_uuid IN ( #{course_uuid_values} )
           ORDER BY uuid ASC
+          FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
         existing_course_bundles  = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
