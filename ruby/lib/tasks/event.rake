@@ -248,6 +248,11 @@ module Event
         }.gsub(/\n\s*/, ' ')
 
         existing_course_bundles  = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
+        bundle_by_course_uuid = existing_course_bundles.inject({}){ |result, bundle|
+          result[bundle.course_uuid] = bundle
+          result
+        }
+
         course_bundles_to_create = []
         bundle_entries_to_create = []
 
@@ -256,18 +261,16 @@ module Event
             target_course_uuid = target_course_event.course_uuid
             target_event_size  = Event::event_data_by_type[target_course_event.event_type.to_sym][:size]
 
-            target_course_open_bundle = existing_course_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
-
-            if target_course_open_bundle &&
-               ( (target_course_open_bundle.size + target_event_size > @max_bundle_size) ||
-                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-              target_course_open_bundle.is_open = false
-              target_course_open_bundle         = nil
+            if bundle_by_course_uuid[target_course_uuid] &&
+               ( (bundle_by_course_uuid[target_course_uuid].size + target_event_size > @max_bundle_size) ||
+                 (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= @max_bundle_events) )
+              bundle_by_course_uuid[target_course_uuid].is_open = false
+              bundle_by_course_uuid[target_course_uuid]         = nil
             end
 
-            if target_course_open_bundle.nil?
+            if bundle_by_course_uuid[target_course_uuid].nil?
               puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
-              target_course_open_bundle = CourseBundle.new(
+              bundle_by_course_uuid[target_course_uuid] = CourseBundle.new(
                 uuid:                   SecureRandom.uuid.to_s,
                 course_uuid:            target_course_event.course_uuid,
                 course_event_seqnum_lo: target_course_event.course_seqnum,
@@ -277,22 +280,22 @@ module Event
                 has_been_processed:     false,
                 waiting_since:          Time.now,
               )
-              course_bundles_to_create << target_course_open_bundle
+              course_bundles_to_create << bundle_by_course_uuid[target_course_uuid]
             else
               # puts "#{Time.now.utc.iso8601(6)}      adding to existing bundle"
-              target_course_open_bundle.course_event_seqnum_hi  = target_course_event.course_seqnum
-              target_course_open_bundle.size                   += target_event_size
+              bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi  = target_course_event.course_seqnum
+              bundle_by_course_uuid[target_course_uuid].size                   += target_event_size
             end
 
-            target_course_event.bundle_uuid = target_course_open_bundle.course_uuid
+            target_course_event.bundle_uuid = bundle_by_course_uuid[target_course_uuid].uuid
 
-            if ( (target_course_open_bundle.size >= @max_bundle_size) ||
-                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-              target_course_open_bundle.is_open = false
+            if ( (bundle_by_course_uuid[target_course_uuid].size >= @max_bundle_size) ||
+                 (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= @max_bundle_events) )
+              bundle_by_course_uuid[target_course_uuid].is_open = false
             end
 
-            target_course_open_bundle.has_been_processed = false
-            target_course_open_bundle.waiting_since      = Time.now
+            bundle_by_course_uuid[target_course_uuid].has_been_processed = false
+            bundle_by_course_uuid[target_course_uuid].waiting_since      = Time.now
           end
         end
 
