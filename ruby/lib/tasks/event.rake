@@ -148,8 +148,8 @@ module Event
         ## Find relavent events that are bundle-able.
         ##
 
-        sql_find_course_events_needing_attention = %Q{
-          SELECT * FROM course_events
+        sql_find_course_uuids_needing_attention = %Q{
+          SELECT DISTINCT course_uuid FROM course_events
           WHERE event_uuid IN
           ( SELECT xx.event_uuid FROM
             ( ( SELECT * FROM course_events
@@ -166,18 +166,64 @@ module Event
             WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
             LIMIT 50
           )
+        }.gsub(/\n\s*/, ' ')
+
+        puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
+
+        course_uuids_needing_attention = CourseEvent.find_by_sql(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
+        break if course_uuids_needing_attention.none?
+
+        course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
+
+        sql_find_course_events_needing_attention = %Q{
+          SELECT * FROM course_events
+          WHERE event_uuid IN
+          ( SELECT xx.event_uuid FROM
+            ( ( SELECT * FROM course_events
+                WHERE bundle_uuid IS NULL
+                AND   course_uuid IN ( #{course_uuid_values} )
+              ) AS yy
+              INNER JOIN
+              bundle_course_states as bces
+              ON  yy.course_uuid   = bces.course_uuid
+              AND yy.course_seqnum BETWEEN bces.last_bundled_seqnum + 1 AND bces.last_bundled_seqnum + 10
+            ) AS xx
+          )
+          ORDER BY event_uuid
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        puts "QUERY: #{sql_find_course_events_needing_attention}"
+        puts "QUERY 2: #{sql_find_course_events_needing_attention}"
 
         course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
-        break if course_events_needing_attention.none?
 
-        course_uuids       = course_events_needing_attention.map(&:course_uuid)
-        course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-        # course_events_needing_attention.each{|event| puts event.inspect}
+        events_by_course_uuid = course_events_needing_attention.sort_by{ |event|
+                                                                  [event.course_uuid, event.course_seqnum]
+                                                                  }.group_by{ |event|
+                                                                    event.course_uuid
+                                                                  }
+
+        # puts "events_by_course_uuid (pre-slice):"
+        # events_by_course_uuid.keys.sort.each{|course_uuid|
+        #   puts "   #{course_uuid}: #{events_by_course_uuid[course_uuid].map{|event| [event.course_seqnum, event.event_uuid]}.sort}"
+        # }
+
+        events_by_course_uuid.map do |course_uuid, course_events|
+          index = course_events.map(&:course_seqnum)
+                               .each_cons(2)
+                               .find_index{|cons| cons[1] - cons[0] != 1}
+          # puts "index = #{index}"
+          unless index.nil?
+            course_events[0..-1] = course_events.slice(0,1+index)
+          end
+        end
+
+        # puts "events_by_course_uuid (post-slice):"
+        # events_by_course_uuid.keys.sort.each{|course_uuid|
+        #   puts "   #{course_uuid}: #{events_by_course_uuid[course_uuid].map{|event| [event.course_seqnum, event.event_uuid]}.sort}"
+        # }
+
         puts "#{course_events_needing_attention.count} events need attention in buckets #{bucket_lo} - #{bucket_hi}"
 
         sql_find_and_lock_bundle_course_states = %Q{
@@ -190,7 +236,7 @@ module Event
         bundle_course_states = BundleCourseState.find_by_sql(sql_find_and_lock_bundle_course_states)
 
         bundle_course_states.each do |state|
-          state.last_bundled_seqnum += 1
+          state.last_bundled_seqnum += events_by_course_uuid[state.course_uuid].count
         end
 
         sql_find_and_lock_course_bundles = %Q{
@@ -205,47 +251,49 @@ module Event
         course_bundles_to_create = []
         bundle_entries_to_create = []
 
-        course_events_needing_attention.each do |target_course_event|
-          target_course_uuid = target_course_event.course_uuid
-          target_event_size  = Event::event_data_by_type[target_course_event.event_type.to_sym][:size]
+        events_by_course_uuid.each do |target_course_uuid, target_course_events|
+          target_course_events.each do |target_course_event|
+            target_course_uuid = target_course_event.course_uuid
+            target_event_size  = Event::event_data_by_type[target_course_event.event_type.to_sym][:size]
 
-          target_course_open_bundle = existing_course_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
+            target_course_open_bundle = existing_course_bundles.detect{|bb| bb.course_uuid == target_course_uuid}
 
-          if target_course_open_bundle &&
-             ( (target_course_open_bundle.size + target_event_size > @max_bundle_size) ||
-               (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-            target_course_open_bundle.is_open = false
-            target_course_open_bundle         = nil
+            if target_course_open_bundle &&
+               ( (target_course_open_bundle.size + target_event_size > @max_bundle_size) ||
+                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
+              target_course_open_bundle.is_open = false
+              target_course_open_bundle         = nil
+            end
+
+            if target_course_open_bundle.nil?
+              puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
+              target_course_open_bundle = CourseBundle.new(
+                uuid:                   SecureRandom.uuid.to_s,
+                course_uuid:            target_course_event.course_uuid,
+                course_event_seqnum_lo: target_course_event.course_seqnum,
+                course_event_seqnum_hi: target_course_event.course_seqnum,
+                size:                   target_event_size,
+                is_open:                true,
+                has_been_processed:     false,
+                waiting_since:          Time.now,
+              )
+              course_bundles_to_create << target_course_open_bundle
+            else
+              # puts "#{Time.now.utc.iso8601(6)}      adding to existing bundle"
+              target_course_open_bundle.course_event_seqnum_hi  = target_course_event.course_seqnum
+              target_course_open_bundle.size                   += target_event_size
+            end
+
+            target_course_event.bundle_uuid = target_course_open_bundle.course_uuid
+
+            if ( (target_course_open_bundle.size >= @max_bundle_size) ||
+                 (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
+              target_course_open_bundle.is_open = false
+            end
+
+            target_course_open_bundle.has_been_processed = false
+            target_course_open_bundle.waiting_since      = Time.now
           end
-
-          if target_course_open_bundle.nil?
-            puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
-            target_course_open_bundle = CourseBundle.new(
-              uuid:                   SecureRandom.uuid.to_s,
-              course_uuid:            target_course_event.course_uuid,
-              course_event_seqnum_lo: target_course_event.course_seqnum,
-              course_event_seqnum_hi: target_course_event.course_seqnum,
-              size:                   target_event_size,
-              is_open:                true,
-              has_been_processed:     false,
-              waiting_since:          Time.now,
-            )
-            course_bundles_to_create << target_course_open_bundle
-          else
-            # puts "#{Time.now.utc.iso8601(6)}      adding to existing bundle"
-            target_course_open_bundle.course_event_seqnum_hi  = target_course_event.course_seqnum
-            target_course_open_bundle.size                   += target_event_size
-          end
-
-          target_course_event.bundle_uuid = target_course_open_bundle.course_uuid
-
-          if ( (target_course_open_bundle.size >= @max_bundle_size) ||
-               (target_course_open_bundle.course_event_seqnum_hi - target_course_open_bundle.course_event_seqnum_lo + 1 >= @max_bundle_events) )
-            target_course_open_bundle.is_open = false
-          end
-
-          target_course_open_bundle.has_been_processed = false
-          target_course_open_bundle.waiting_since      = Time.now
         end
 
         if course_events_needing_attention.any?

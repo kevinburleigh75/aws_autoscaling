@@ -33,19 +33,6 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.index ["bucket_uuid"], name: "index_bundle_buckets_on_bucket_uuid", unique: true
   end
 
-  create_table "bundle_course_indicators", force: :cascade do |t|
-    t.uuid "indicator_uuid", null: false
-    t.uuid "course_uuid", null: false
-    t.string "source", null: false
-    t.boolean "has_been_processed", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["course_uuid", "has_been_processed", "created_at"], name: "index_bcis_on_cu_hbp_ca"
-    t.index ["created_at", "has_been_processed"], name: "index_bcis_on_ca_hbp"
-    t.index ["has_been_processed", "course_uuid", "created_at"], name: "index_bcis_on_hbp_cu_ca"
-    t.index ["indicator_uuid"], name: "index_bundle_course_indicators_on_indicator_uuid", unique: true
-  end
-
   create_table "bundle_course_states", force: :cascade do |t|
     t.uuid "course_uuid", null: false
     t.integer "last_bundled_seqnum", null: false
