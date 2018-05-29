@@ -46,6 +46,21 @@
             "Type": "String",
             "ConstraintDescription": "E.g., \"/bin/bash -xe /home/ubuntu/primary_repo/services/some_script.sh\n\""
         },
+        "SecurityGroup": {
+            "Description": "SecurityGroup that ASG instances should have",
+            "Type": "String",
+            "ConstraintDescription": "Must be a valid SecurityGroup id"
+        },
+        "VpcZoneIdentifier": {
+            "Description": "Comma-separated list of subnets ids in which instances are placed",
+            "Type": "String",
+            "ConstraintDescription": "Must be valid VPC subnet ids"
+        },
+        "Profile": {
+            "Description": "InstanceProfile",
+            "Type": "String",
+            "ConstraintDescription": "must be a vaild IAM InstanceProfile"
+        },
         "KeyName": {
             "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
             "Type": "AWS::EC2::KeyPair::KeyName",
@@ -62,11 +77,11 @@
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
                 "ImageId": { "Ref": "ImageId" },
-                "InstanceType": "t2.micro",
+                "InstanceType": "m3.medium",
                 "SecurityGroups": [
-                    "sg-9f7085ec"
+                    { "Ref": "SecurityGroup" }
                 ],
-                "IamInstanceProfile": "arn:aws:iam::714205614004:instance-profile/secrets-exper-role",
+                "IamInstanceProfile": { "Ref": "Profile"},
                 "UserData": {
                     "Fn::Base64": {
                         "Fn::Join": [
@@ -131,6 +146,9 @@
             "Type": "AWS::AutoScaling::AutoScalingGroup",
             "Properties": {
                 "LaunchConfigurationName": { "Ref": "Lc" },
+                "VPCZoneIdentifier": {
+                    "Fn::Split": [",", { "Ref": "VpcZoneIdentifier" }]
+                },
                 "Tags": [
                     {
                         "Key":               "Name",

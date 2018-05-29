@@ -232,6 +232,79 @@
                 "VpcId": { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-VpcId" } }
             }
         },
+        "AsgInstanceProfile":
+        {
+           "Type": "AWS::IAM::InstanceProfile",
+           "Properties": {
+              "Roles": [ {"Ref": "AsgInstanceRole"} ]
+           }
+        },
+        "AsgInstanceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                      {
+                        "Effect": "Allow",
+                        "Principal": {
+                          "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                      }
+                    ]
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": { "Fn::Sub": "${AWS::StackName}-AsgInstancePolicy" },
+                        "PolicyDocument": {
+                            "Version" : "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "autoscaling:Describe*",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "autoscaling:*",
+                                    "Resource": {  "Fn::Sub": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/${AWS::StackName}-*" }
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "ec2:Describe*",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "cloudwatch:PutMetricAlarm",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "iam:CreateServiceLinkedRole",
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "iam:AWSServiceName": "autoscaling.amazonaws.com"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
         "CreationAsgStack": {
             "Type": "AWS::CloudFormation::Stack",
             "Properties": {
@@ -246,6 +319,15 @@
                     "DesiredCapacity":      { "Ref": "CreationAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-creation-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_creation.sh",
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
@@ -264,6 +346,15 @@
                     "DesiredCapacity":      { "Ref": "MigrationAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-migration-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_migration.sh",
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
@@ -284,6 +375,7 @@
                     "TargetGroupArn":       { "Ref": "ElbGroup1" },
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_one.sh",
                     "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
                     "VpcZoneIdentifier": {
                         "Fn::Join": [ ",", [
                             { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
@@ -311,6 +403,7 @@
                     "TargetGroupArn":       { "Ref": "ElbGroup2" },
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_two.sh",
                     "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
                     "VpcZoneIdentifier": {
                         "Fn::Join": [ ",", [
                             { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
@@ -336,6 +429,15 @@
                     "DesiredCapacity":      { "Ref": "EventCreateAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-event-create-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_create.sh",
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
@@ -354,6 +456,15 @@
                     "DesiredCapacity":      { "Ref": "EventBundleAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-event-bundle-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_bundle.sh",
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
@@ -372,6 +483,15 @@
                     "DesiredCapacity":      { "Ref": "EventFetchAsgDesiredCapacity" },
                     "InstanceTagName":      "asg-event-fetch-instance",
                     "PostCfnInitCommand":   "/bin/bash -xe /home/ubuntu/primary_repo/services/after_cfn_init_event_fetch.sh",
+                    "SecurityGroup":        { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SecurityGroupId" } },
+                    "Profile":              { "Fn::GetAtt": ["AsgInstanceProfile", "Arn"] },
+                    "VpcZoneIdentifier": {
+                        "Fn::Join": [ ",", [
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId1" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId2" } },
+                            { "Fn::ImportValue": { "Fn::Sub": "${VpcStackName}-SubnetId3" } }
+                        ]]
+                    },
                     "KeyName":              { "Ref": "KeyName" }
                 }
             }
