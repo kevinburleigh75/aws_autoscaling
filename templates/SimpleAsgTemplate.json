@@ -77,7 +77,7 @@
             "Type": "AWS::AutoScaling::LaunchConfiguration",
             "Properties": {
                 "ImageId": { "Ref": "ImageId" },
-                "InstanceType": "m3.medium",
+                "InstanceType": "t2.micro",
                 "SecurityGroups": [
                     { "Ref": "SecurityGroup" }
                 ],
@@ -155,11 +155,6 @@
                         "Value":             { "Ref": "InstanceTagName" },
                         "PropagateAtLaunch": "true"
                     }
-                ],
-                "AvailabilityZones": [
-                    "us-east-1a",
-                    "us-east-1b",
-                    "us-east-1c"
                 ],
                 "DesiredCapacity": { "Ref": "DesiredCapacity" },
                 "MinSize":         { "Ref": "MinSize" },
