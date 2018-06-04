@@ -1,24 +1,78 @@
 {
     "AWSTemplateFormatVersion": "2010-09-09",
     "Resources": {
+        "TestInstanceProfile":
+        {
+           "Type": "AWS::IAM::InstanceProfile",
+           "Properties": {
+              "Roles": [ {"Ref": "TestRole"} ]
+           }
+        },
         "TestRole": {
             "Type": "AWS::IAM::Role",
             "Properties": {
                 "AssumeRolePolicyDocument": {
                     "Version": "2012-10-17",
-                    "Id": "some-uuid",
                     "Statement": [
-                        {
-                            "Effect": "Allow",
-                            "Action": "autoscaling:*",
-                            "Principal": {"Service": "autoscaling.amazonaws.com"}
-                        }
+                      {
+                        "Effect": "Allow",
+                        "Principal": {
+                          "Service": "ec2.amazonaws.com"
+                        },
+                        "Action": "sts:AssumeRole"
+                      }
                     ]
-                }
+                },
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "SomePolicyName",
+                        "PolicyDocument": {
+                            "Version" : "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "autoscaling:Describe*",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "autoscaling:*",
+                                    "Resource": "arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/VpcElbStack-*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "ec2:Describe*",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "cloudwatch:PutMetricAlarm",
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:Get*",
+                                        "s3:List*"
+                                    ],
+                                    "Resource": "*"
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "iam:CreateServiceLinkedRole",
+                                    "Resource": "*",
+                                    "Condition": {
+                                        "StringEquals": {
+                                            "iam:AWSServiceName": "autoscaling.amazonaws.com"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
             }
         }
-    },
-    "Outputs": {
-
     }
 }

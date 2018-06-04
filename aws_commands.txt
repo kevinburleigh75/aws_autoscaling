@@ -207,7 +207,7 @@ aws cloudformation create-stack \
       ParameterKey=VpcStackName,ParameterValue=VpcStack \
       ParameterKey=EnvName,ParameterValue=blah \
       ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
-      ParameterKey=BranchNameOrSha,ParameterValue=master \
+      ParameterKey=BranchNameOrSha,ParameterValue=bucket_exper \
       ParameterKey=KeyName,ParameterValue=kevin_va_kp \
       ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
       ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
@@ -228,7 +228,7 @@ aws cloudformation update-stack \
       ParameterKey=VpcStackName,ParameterValue=VpcStack \
       ParameterKey=EnvName,ParameterValue=blah \
       ParameterKey=RepoUrl,ParameterValue=https://github.com/kevinburleigh75/aws_autoscaling.git \
-      ParameterKey=BranchNameOrSha,ParameterValue=master \
+      ParameterKey=BranchNameOrSha,ParameterValue=bucket_exper \
       ParameterKey=KeyName,ParameterValue=kevin_va_kp \
       ParameterKey=ElbAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/ElbAsgTemplate.json \
       ParameterKey=SimpleAsgStackTemplateUrl,ParameterValue=https://s3.amazonaws.com/kevin-templates/SimpleAsgTemplate.json \
@@ -242,3 +242,15 @@ aws cloudformation update-stack \
       ParameterKey=EventBundleAsgDesiredCapacity,ParameterValue=0 \
       ParameterKey=EventFetchAsgDesiredCapacity,ParameterValue=0 \
   --stack-name VpcElbStack
+
+
+arn:aws:autoscaling:*:*:autoScalingGroup:*:autoScalingGroupName/VpcElbStack-*
+
+aws iam create-role --path /TestStack/TestComponent/EventBundleAsgStack --role-name InstanceRole --description "test role for ASGs" --assume-role-policy-document file://test_role_policy_document.json
+aws iam create-role --path /TestStack/TestComponent/EventBundleAsgStack/ --role-name InstanceRole --description "test role for ASGs" --assume-role-policy-document file://test_role_policy_document.json
+aws iam attach-role-policy --role-name /TestStack/TestComponent/EventBundleAsgStack/InstanceRole --policy-arn arn:aws:iam::aws:policy/AutoScalingFullAccess
+aws iam attach-role-policy --role-name InstanceRole --policy-arn arn:aws:iam::aws:policy/AutoScalingFullAccess
+aws iam attach-role-policy --role-name InstanceRole --policy-arn arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+aws iam put-role-policy --role-name InstanceRole --policy-name CustomInlinePolicy --policy-document file://custom_inline_policy.json
+aws iam create-role --role-name StackName-ComponentName-InstanceRole --description "test role for ASGs" --assume-role-policy-document file://test_role_policy_document.json
+aws iam create-role --role-name StackName-AsgInstanceRole --description "test role for ASGs" --assume-role-policy-document file://test_role_policy_document.json
