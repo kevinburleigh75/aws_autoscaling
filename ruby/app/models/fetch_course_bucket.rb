@@ -1,0 +1,2 @@
+class FetchCourseBucket < ApplicationRecord
+end

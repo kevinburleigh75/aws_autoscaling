@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20180514221807) do
+ActiveRecord::Schema.define(version: 20180614093349) do
 
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
@@ -33,6 +33,15 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.index ["bucket_uuid"], name: "index_bundle_buckets_on_bucket_uuid", unique: true
   end
 
+  create_table "bundle_course_buckets", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "bucket_num", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bucket_num", "course_uuid"], name: "index_bundle_course_buckets_on_bucket_num_and_course_uuid"
+    t.index ["course_uuid"], name: "index_bundle_course_buckets_on_course_uuid", unique: true
+  end
+
   create_table "bundle_course_states", force: :cascade do |t|
     t.uuid "course_uuid", null: false
     t.integer "last_bundled_seqnum", null: false
@@ -40,15 +49,6 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.datetime "updated_at", null: false
     t.index ["course_uuid"], name: "index_bundle_course_states_on_course_uuid", unique: true
     t.index ["last_bundled_seqnum", "course_uuid"], name: "index_bcss_on_lbs_cu"
-  end
-
-  create_table "course_buckets", force: :cascade do |t|
-    t.uuid "course_uuid", null: false
-    t.integer "bucket_num", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["bucket_num", "course_uuid"], name: "index_course_buckets_on_bucket_num_and_course_uuid"
-    t.index ["course_uuid"], name: "index_course_buckets_on_course_uuid", unique: true
   end
 
   create_table "course_bundle_entries", force: :cascade do |t|
@@ -111,15 +111,6 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.index ["waiting_since"], name: "index_course_client_states_on_waiting_since"
   end
 
-  create_table "course_clients", force: :cascade do |t|
-    t.uuid "uuid", null: false
-    t.string "name", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["name"], name: "index_course_clients_on_name", unique: true
-    t.index ["uuid"], name: "index_course_clients_on_uuid", unique: true
-  end
-
   create_table "course_events", force: :cascade do |t|
     t.uuid "course_uuid", null: false
     t.integer "course_seqnum", null: false
@@ -131,7 +122,52 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.datetime "updated_at", null: false
     t.index ["bundle_uuid", "course_uuid", "course_seqnum"], name: "index_ce_on_bu_cu_csn"
     t.index ["course_uuid", "course_seqnum"], name: "index_course_events_on_course_uuid_and_course_seqnum", unique: true
+    t.index ["created_at"], name: "index_course_events_on_created_at"
     t.index ["event_uuid"], name: "index_course_events_on_event_uuid", unique: true
+  end
+
+  create_table "fetch_buckets", force: :cascade do |t|
+    t.uuid "bucket_uuid", null: false
+    t.integer "bucket_num", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bucket_num"], name: "index_fetch_buckets_on_bucket_num", unique: true
+    t.index ["bucket_uuid"], name: "index_fetch_buckets_on_bucket_uuid", unique: true
+  end
+
+  create_table "fetch_course_buckets", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "bucket_num", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["bucket_num", "course_uuid"], name: "index_fetch_course_buckets_on_bucket_num_and_course_uuid"
+    t.index ["course_uuid"], name: "index_fetch_course_buckets_on_course_uuid", unique: true
+  end
+
+  create_table "fetch_course_clients", force: :cascade do |t|
+    t.uuid "client_uuid", null: false
+    t.string "client_name", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_name"], name: "index_fetch_course_clients_on_client_name", unique: true
+    t.index ["client_uuid"], name: "index_fetch_course_clients_on_client_uuid", unique: true
+  end
+
+  create_table "fetch_course_states", force: :cascade do |t|
+    t.uuid "client_uuid", null: false
+    t.uuid "course_uuid", null: false
+    t.integer "last_confirmed_course_seqnum", null: false
+    t.boolean "needs_attention", null: false
+    t.datetime "waiting_since", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["client_uuid", "course_uuid", "last_confirmed_course_seqnum"], name: "index_fcss_on_cu_cu_lccs"
+    t.index ["client_uuid", "course_uuid"], name: "index_fcss_on_cu_cu", unique: true
+    t.index ["client_uuid"], name: "index_fetch_course_states_on_client_uuid"
+    t.index ["course_uuid"], name: "index_fetch_course_states_on_course_uuid"
+    t.index ["needs_attention", "client_uuid", "course_uuid"], name: "index_fcss_on_na_cu_cu"
+    t.index ["needs_attention"], name: "index_fetch_course_states_on_needs_attention"
+    t.index ["waiting_since"], name: "index_fetch_course_states_on_waiting_since"
   end
 
   create_table "health_check_events", force: :cascade do |t|
@@ -176,6 +212,16 @@ ActiveRecord::Schema.define(version: 20180514221807) do
     t.datetime "updated_at", null: false
     t.index ["aws_instance_id", "created_at", "request_elapsed"], name: "index_rrs_on_aii_ca_re"
     t.index ["has_been_processed", "created_at"], name: "index_request_records_on_has_been_processed_and_created_at"
+  end
+
+  create_table "temp_course_event_metadata", force: :cascade do |t|
+    t.uuid "course_uuid", null: false
+    t.integer "last_created_course_seqnum", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["course_uuid"], name: "index_temp_course_event_metadata_on_course_uuid", unique: true
+    t.index ["created_at"], name: "index_temp_course_event_metadata_on_created_at"
+    t.index ["updated_at"], name: "index_temp_course_event_metadata_on_updated_at"
   end
 
 end

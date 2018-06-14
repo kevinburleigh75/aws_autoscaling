@@ -32,35 +32,30 @@ module Event
 
       @counter = 0
 
-      @course_uuids   = num_courses.times.map{ SecureRandom.uuid.to_s }
-      @course_seqnums = @course_uuids.inject({}) { |result, uuid|
-        result[uuid] = Array(0..0)
-        result
-      }
+      ##
+      ## Pull a random set of course uuids from the db.
+      ##
+
+      sql_find_random_course_uuids = %Q{
+        SELECT course_uuid FROM temp_course_event_metadata
+        ORDER BY random()
+        LIMIT #{num_courses}
+      }.gsub(/\n\s*/, ' ')
+
+      rows = ActiveRecord::Base.connection.execute(sql_find_random_course_uuids)
+      fail "unable to load desired number of course uuids from database (actual != expected) (#{rows.count} != #{num_courses})" \
+        if rows.count != num_courses
+
+      @course_uuids = rows.map{|row| row['course_uuid']}
+
+      ##
+      ## Determine the cutoffs used when determining event types.
+      ##
 
       freqs          = Event::event_types.map{|type| Event::event_data_by_type[type][:freq]}
       freq_sum       = freqs.inject(&:+)
       freq_cumsums   = freqs.inject([]){|result, freq| result << (result.last || 0) + freq; result}
       @event_cutoffs = freq_cumsums.map{|value| value/freq_sum}
-
-      course_buckets = @course_uuids.map{ |course_uuid|
-        CourseBucket.new(
-          course_uuid: course_uuid,
-          bucket_num:  Kernel.rand(100),
-        )
-      }
-
-      course_states = @course_uuids.map{ |course_uuid|
-        BundleCourseState.new(
-          course_uuid:          course_uuid,
-          last_bundled_seqnum:  -1,
-        )
-      }
-
-      CourseBucket.transaction(isolation: :read_committed) do
-        CourseBucket.import course_buckets
-        BundleCourseState.import course_states
-      end
     end
 
     def do_work(protocol:)
@@ -72,33 +67,61 @@ module Event
 
       start = Time.now
 
-      course_events = @events_per_interval.times.map{
-        course_uuid = @course_uuids.sample
+      course_events = CourseEvent.transaction(isolation: :read_committed) do
+        ##
+        ## Determine which courses will have new events, and lock
+        ## the associated TempCourseEventMetadata rows.
+        ##
 
-        seqnum         = @course_seqnums[course_uuid].sample
-        new_max_seqnum = 1 + @course_seqnums[course_uuid].max
+        event_course_uuids       = @course_uuids.sample(@events_per_interval)
+        event_course_uuid_values = event_course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
 
-        @course_seqnums[course_uuid].delete(seqnum)
-        @course_seqnums[course_uuid] << new_max_seqnum
+        sql_find_and_lock_temp_course_event_metadatas = %Q{
+          SELECT * FROM temp_course_event_metadata
+          WHERE course_uuid in ( #{event_course_uuid_values} )
+          ORDER BY course_uuid ASC
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
 
-        rand_value = Kernel::rand()
-        event_type = Event::event_types[@event_cutoffs.each_index.detect{|ii| @event_cutoffs[ii] >= rand_value}]
+        temp_course_event_metadatas = TempCourseEventMetadata.find_by_sql(sql_find_and_lock_temp_course_event_metadatas)
 
-        CourseEvent.new(
-          course_uuid:        course_uuid,
-          course_seqnum:      seqnum,
-          event_type:         event_type,
-          event_uuid:         SecureRandom.uuid.to_s,
-          event_time:         Time.now,
-        )
-      }
+        course_events = temp_course_event_metadatas.map{ |temp_course_event_metadata|
+          course_uuid = temp_course_event_metadata.course_uuid
 
-      CourseEvent.transaction(isolation: :read_committed) do
+          seqnum = 1 + temp_course_event_metadata.last_created_course_seqnum
+
+          rand_value = Kernel::rand()
+          event_type = Event::event_types[@event_cutoffs.each_index.detect{|ii| @event_cutoffs[ii] >= rand_value}]
+
+          CourseEvent.new(
+            course_uuid:        course_uuid,
+            course_seqnum:      seqnum,
+            event_type:         event_type,
+            event_uuid:         SecureRandom.uuid.to_s,
+            event_time:         Time.now,
+          )
+        }
+
+        temp_course_event_metadatas.each do |tcem|
+          tcem.last_created_course_seqnum += 1
+        end
+
         CourseEvent.import course_events
+
+        TempCourseEventMetadata.import(
+          temp_course_event_metadatas,
+          on_duplicate_key_update: {
+            conflict_target:  [:course_uuid],
+            columns:          TempCourseEventMetadata.column_names - ['updated_at', 'created_at']
+          }
+        )
+
+        course_events
       end
 
       elapsed = Time.now - start
       Rails.logger.info "   create wrote #{course_events.size} events in #{'%1.3e' % elapsed} sec"
+      puts "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} created #{course_events.size} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(protocol:)
@@ -152,7 +175,8 @@ module Event
           SELECT DISTINCT course_uuid FROM course_events
           WHERE event_uuid IN
           ( SELECT xx.event_uuid FROM
-            ( ( SELECT * FROM course_events
+            ( SELECT yy.created_at,yy.event_uuid,bcbs.bucket_num FROM
+              ( SELECT * FROM course_events
                 WHERE bundle_uuid IS NULL
               ) AS yy
               INNER JOIN
@@ -160,10 +184,11 @@ module Event
               ON  yy.course_uuid   = bces.course_uuid
               AND yy.course_seqnum = bces.last_bundled_seqnum + 1
               INNER JOIN
-              course_buckets as cbs
-              ON yy.course_uuid = cbs.course_uuid
+              bundle_course_buckets as bcbs
+              ON yy.course_uuid = bcbs.course_uuid
             ) AS xx
             WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+            ORDER BY xx.created_at ASC
             LIMIT 50
           )
         }.gsub(/\n\s*/, ' ')
@@ -193,7 +218,7 @@ module Event
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        puts "QUERY 2: #{sql_find_course_events_needing_attention}"
+        # puts "QUERY 2: #{sql_find_course_events_needing_attention}"
 
         course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
 
@@ -247,7 +272,7 @@ module Event
           FOR UPDATE
         }.gsub(/\n\s*/, ' ')
 
-        existing_course_bundles  = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
+        existing_course_bundles = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
         bundle_by_course_uuid = existing_course_bundles.inject({}){ |result, bundle|
           result[bundle.course_uuid] = bundle
           result
@@ -349,30 +374,147 @@ module Event
     end
 
     def do_work(protocol:)
-      # Rails.logger.level = :info #unless modulo == 0
+      Rails.logger.level = :info #unless modulo == 0
 
-      # ##
-      # ## If @client_uuid has not been set, try to set it.
-      # ##
+      ##
+      ## If @client_uuid has not been set, try to set it.
+      ##
 
-      # unless @client_uuid
-      #   ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-      #     sql_find_clients = %Q{
-      #       SELECT * FROM course_clients
-      #       WHERE name = '#{@client_name}'
-      #     }.gsub(/\n\s*/, ' ')
+      unless @client_uuid
+        ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
+          sql_find_clients = %Q{
+            SELECT * FROM fetch_course_clients
+            WHERE client_name = '#{@client_name}'
+            LIMIT 1
+          }.gsub(/\n\s*/, ' ')
 
-      #     client = CourseClient.find_by_sql(sql_find_clients).first
-      #     return if client.nil?
+          client = FetchCourseClient.find_by_sql(sql_find_clients).first
+          return if client.nil?
 
-      #     @client_uuid = client.uuid
-      #   end
-      # end
+          @client_uuid = client.client_uuid
+        end
+      end
 
-      # @counter += 1
-      # Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
+      @counter += 1
+      Rails.logger.info "#{Time.now.utc.iso8601(6)} #{Process.pid} #{protocol.group_uuid}:[#{protocol.modulo}/#{protocol.count}] #{protocol.am_boss? ? '*' : ' '} #{@counter % 10} working away as usual..."
 
-      # start = Time.now
+      start = Time.now
+
+      num_processed_events = CourseEvent.transaction(isolation: :read_committed) do
+        ##
+        ## Lock the buckets handled by this worker.
+        ##
+
+        bucket_lo = (Rational(100) / protocol.count * protocol.modulo).floor
+        bucket_hi = (Rational(100) / protocol.count * (protocol.modulo+1)).floor - 1
+
+        sql_find_and_lock_fetch_buckets = %Q{
+          SELECT 1 FROM fetch_buckets
+          WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+          ORDER BY bucket_num
+          FOR UPDATE
+        }.gsub(/\n\s*/, ' ')
+
+        ActiveRecord::Base.connection.execute(sql_find_and_lock_fetch_buckets)
+
+        ##
+        ## Find courses with new events for this client.
+        ##
+
+        sql_find_course_uuids_needing_attention = %Q{
+          SELECT t2.course_uuid FROM
+          ( SELECT * FROM
+            ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,fcss.waiting_since,fcbs.bucket_num FROM
+              fetch_course_states AS fcss
+              INNER JOIN fetch_course_buckets AS fcbs
+              ON fcss.course_uuid = fcbs.course_uuid
+            ) AS t1
+            WHERE t1.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+          ) AS t2
+          INNER JOIN bundle_course_states AS bcss
+          ON t2.course_uuid = bcss.course_uuid
+          WHERE t2.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
+          ORDER BY waiting_since ASC
+          LIMIT 50
+        }.gsub(/\n\s*/, ' ')
+
+        puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
+
+        course_uuids_needing_attention = ActiveRecord::Base.connection.execute(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
+        break if course_uuids_needing_attention.none?
+
+        course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
+
+        ##
+        ## Find the
+        ##
+
+        sql_find_course_events_needing_attention = %Q{
+          SELECT * FROM course_events
+          WHERE event_uuid IN
+          ( SELECT t1.event_uuid FROM
+            ( SELECT ces.event_uuid,ces.course_uuid,ces.course_seqnum,bcss.last_bundled_seqnum
+              FROM course_events AS ces
+              INNER JOIN bundle_course_states AS bcss
+              ON ces.course_uuid = bcss.course_uuid
+              WHERE ces.course_uuid IN ( #{course_uuid_values} )
+            ) AS t1
+            INNER JOIN LATERAL
+            ( SELECT * FROM fetch_course_states AS fcss
+              WHERE fcss.client_uuid = '#{@client_uuid}'
+              AND   fcss.course_uuid = t1.course_uuid
+              AND   t1.course_seqnum BETWEEN fcss.last_confirmed_course_seqnum + 1
+                                     AND LEAST(fcss.last_confirmed_course_seqnum + 10, t1.last_bundled_seqnum)
+              LIMIT 10
+            ) AS t2
+            ON TRUE
+          )
+        }.gsub(/\n\s*/, ' ')
+
+        puts "QUERY 2: #{sql_find_course_events_needing_attention}"
+
+        course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
+
+        course_events_by_course_uuid = course_events_needing_attention.group_by{ |event|
+          event.course_uuid
+        }
+
+        course_uuids = course_events_by_course_uuid.keys.sort
+
+        ##
+        ## Update the FetchCourseStates
+        ##
+
+        fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
+                                              .lock
+                                              .to_a
+
+        fetch_course_states.each do |fetch_course_state|
+          new_last_confirmed_course_seqnum = course_events_by_course_uuid[fetch_course_state.course_uuid]
+                                              .sort_by{|event| event.course_seqnum}
+                                              .last
+                                              .course_seqnum
+
+          fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
+        end
+
+        if fetch_course_states.any?
+          FetchCourseState.import(
+            fetch_course_states,
+            on_duplicate_key_update: {
+              conflict_target: [:client_uuid, :course_uuid],
+              columns:         FetchCourseState.column_names - ['updated_at', 'created_at']
+            }
+          )
+        end
+
+        course_events_needing_attention.count
+      end
+
+      elapsed = Time.now - start
+
+      puts "#{Time.now.utc.iso8601(6)} processed #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
 
       # puts "#{Time.now.utc.iso8601(6)} starting transaction"
       # num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
@@ -512,10 +654,6 @@ module Event
 
       #   num_processed_events
       # end
-      # elapsed = Time.now - start
-
-      # puts "#{Time.now.utc.iso8601(6)} finished transaction elapsed = #{'%1.3e' % elapsed}"
-      # Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(protocol:)
@@ -589,6 +727,58 @@ module Event
 end
 
 namespace :event do
+  desc 'create courses'
+  task :create_courses, [:num_courses] => :environment do |t, args|
+    num_courses = (args[:num_courses] || '1').to_i
+
+    start = Time.now
+
+    course_uuids = num_courses.times.map{ SecureRandom.uuid.to_s }
+
+    bundle_course_buckets = course_uuids.map{ |course_uuid|
+      BundleCourseBucket.new(
+        course_uuid: course_uuid,
+        bucket_num:  Kernel.rand(100),
+      )
+    }
+
+    bundle_course_states = course_uuids.map{ |course_uuid|
+      BundleCourseState.new(
+        course_uuid:          course_uuid,
+        last_bundled_seqnum:  -1,
+      )
+    }
+
+    fetch_course_buckets = course_uuids.map{ |course_uuid|
+      FetchCourseBucket.new(
+        course_uuid: course_uuid,
+        bucket_num:  Kernel.rand(100),
+      )
+    }
+
+    temp_course_event_metadatas = course_uuids.map{ |course_uuid|
+      TempCourseEventMetadata.new(
+        course_uuid:                course_uuid,
+        last_created_course_seqnum: -1,
+      )
+    }
+
+    BundleCourseBucket.transaction(isolation: :read_committed) do
+      BundleCourseBucket.import bundle_course_buckets
+      BundleCourseState.import  bundle_course_states
+
+      FetchCourseBucket.import fetch_course_buckets
+
+      TempCourseEventMetadata.import temp_course_event_metadatas
+    end
+
+    elapsed = Time.now - start
+
+    puts "created #{num_courses} courses in #{elapsed} sec"
+  end
+end
+
+namespace :event do
   desc 'create course events'
   task :create, [:group_uuid, :work_interval, :work_modulo, :work_offset, :events_per_interval, :num_courses] => :environment do |t, args|
     group_uuid          = args[:group_uuid]
@@ -655,6 +845,81 @@ namespace :event do
     )
 
     protocol.run
+  end
+end
+
+namespace :event do
+  desc 'create client'
+  task :create_client, [:client_name] => :environment do |t, args|
+    client_name = args[:client_name]
+    client_uuid = SecureRandom.uuid.to_s
+
+    course_client = FetchCourseClient.transaction(isolation: :read_committed) do
+      course_client = FetchCourseClient.new(
+        client_name: client_name,
+        client_uuid: client_uuid,
+      )
+
+      FetchCourseClient.import(
+        [course_client],
+        on_duplicate_key_ignore: true
+      )
+
+      course_client = FetchCourseClient.where(client_name: client_name).first
+
+      course_client
+    end
+
+    if course_client.client_uuid == client_uuid
+      puts "  created client #{client_name} with client_uuid #{course_client.client_uuid}"
+    else
+      puts "  client #{client_name} already existed with client_uuid #{course_client.client_uuid}"
+    end
+  end
+end
+
+namespace :event do
+  desc 'update clients'
+  task :update_clients => :environment do |t, args|
+    FetchCourseState.transaction(isolation: :read_committed) do
+      ##
+      ## Find
+      ##
+
+      sql_find_missing_course_and_client_uuids = %Q{
+        SELECT t1.course_uuid,t1.client_uuid FROM
+        ( SELECT * FROM fetch_course_buckets,fetch_course_clients ) AS t1
+        FULL OUTER JOIN
+        fetch_course_states AS fcss
+        ON  t1.course_uuid = fcss.course_uuid
+        AND t1.client_uuid = fcss.client_uuid
+        WHERE fcss.course_uuid IS NULL
+        LIMIT 10000
+      }.gsub(/\n\s*/, ' ')
+
+      course_client_uuid_pairs = ActiveRecord::Base.connection.execute(sql_find_missing_course_and_client_uuids).map{|row| [row['course_uuid'], row['client_uuid']]}
+      puts "updating #{course_client_uuid_pairs.count} course/clients pairs"
+      break if course_client_uuid_pairs.none?
+
+      ##
+      ## Create
+      ##
+
+      fetch_client_states = course_client_uuid_pairs.map{ |course_uuid,client_uuid|
+        FetchCourseState.new(
+          course_uuid:                  course_uuid,
+          client_uuid:                  client_uuid,
+          last_confirmed_course_seqnum: -1,
+          needs_attention:              false,
+          waiting_since:                Time.now.utc,
+        )
+      }
+
+      FetchCourseState.import(
+        fetch_client_states,
+        on_duplicate_key_ignore: true,
+      )
+    end
   end
 end
 
