@@ -374,7 +374,7 @@ module Event
     end
 
     def do_work(protocol:)
-      Rails.logger.level = :info #unless modulo == 0
+      Rails.logger.level = :info unless protocol.modulo == 0
 
       ##
       ## If @client_uuid has not been set, try to set it.
@@ -401,6 +401,8 @@ module Event
       start = Time.now
 
       num_processed_events = CourseEvent.transaction(isolation: :read_committed) do
+        puts "#{Time.now.utc.iso8601(6)} A"
+
         ##
         ## Lock the buckets handled by this worker.
         ##
@@ -428,6 +430,7 @@ module Event
               fetch_course_states AS fcss
               INNER JOIN fetch_course_buckets AS fcbs
               ON fcss.course_uuid = fcbs.course_uuid
+              WHERE fcss.client_uuid = '#{@client_uuid}'
             ) AS t1
             WHERE t1.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
           ) AS t2
@@ -441,30 +444,32 @@ module Event
         puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
 
         course_uuids_needing_attention = ActiveRecord::Base.connection.execute(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
-        break if course_uuids_needing_attention.none?
+        break 0 if course_uuids_needing_attention.none?
 
         course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
 
         ##
-        ## Find the
+        ## Find the CourseEvents needing attention from this client.
         ##
 
         sql_find_course_events_needing_attention = %Q{
           SELECT * FROM course_events
           WHERE event_uuid IN
-          ( SELECT t1.event_uuid FROM
-            ( SELECT ces.event_uuid,ces.course_uuid,ces.course_seqnum,bcss.last_bundled_seqnum
-              FROM course_events AS ces
+          ( SELECT t2.event_uuid FROM
+            ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,bcss.last_bundled_seqnum
+              FROM fetch_course_states AS fcss
               INNER JOIN bundle_course_states AS bcss
-              ON ces.course_uuid = bcss.course_uuid
-              WHERE ces.course_uuid IN ( #{course_uuid_values} )
+              ON fcss.course_uuid = bcss.course_uuid
+              WHERE fcss.client_uuid = '#{@client_uuid}'
+              AND   fcss.course_uuid IN ( #{course_uuid_values} )
+              AND   fcss.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
             ) AS t1
             INNER JOIN LATERAL
-            ( SELECT * FROM fetch_course_states AS fcss
-              WHERE fcss.client_uuid = '#{@client_uuid}'
-              AND   fcss.course_uuid = t1.course_uuid
-              AND   t1.course_seqnum BETWEEN fcss.last_confirmed_course_seqnum + 1
-                                     AND LEAST(fcss.last_confirmed_course_seqnum + 10, t1.last_bundled_seqnum)
+            ( SELECT *
+              FROM course_events AS ces
+              WHERE ces.course_uuid = t1.course_uuid
+              AND   ces.course_seqnum BETWEEN t1.last_confirmed_course_seqnum + 1
+                                      AND LEAST(t1.last_confirmed_course_seqnum + 10, t1.last_bundled_seqnum)
               LIMIT 10
             ) AS t2
             ON TRUE
@@ -485,6 +490,8 @@ module Event
         ## Update the FetchCourseStates
         ##
 
+        puts "#{Time.now.utc.iso8601(6)} B"
+
         fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
                                               .lock
                                               .to_a
@@ -497,6 +504,7 @@ module Event
 
           fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
         end
+        puts "#{Time.now.utc.iso8601(6)} C"
 
         if fetch_course_states.any?
           FetchCourseState.import(
@@ -508,6 +516,8 @@ module Event
           )
         end
 
+        puts "#{Time.now.utc.iso8601(6)} D"
+
         course_events_needing_attention.count
       end
 
@@ -515,145 +525,6 @@ module Event
 
       puts "#{Time.now.utc.iso8601(6)} processed #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
       Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
-
-      # puts "#{Time.now.utc.iso8601(6)} starting transaction"
-      # num_processed_events = ActiveRecord::Base.connection.transaction(isolation: :read_committed) do
-      #   current_time = Time.now
-
-      #   ##
-      #   ## Find and lock the client states needing attention.
-      #   ##
-
-      #   sql_find_and_lock_course_client_states = %Q{
-      #     SELECT * FROM course_client_states
-      #     WHERE course_uuid IN (
-      #       SELECT course_uuid FROM course_client_states
-      #       WHERE needs_attention = TRUE
-      #       AND   client_uuid = '#{@client_uuid}'
-      #       AND   uuid_partition(course_uuid) % #{protocol.count} = #{protocol.modulo}
-      #       ORDER BY waiting_since ASC
-      #       LIMIT 10
-      #     )
-      #     AND client_uuid = '#{@client_uuid}'
-      #     ORDER BY course_uuid ASC
-      #     FOR UPDATE
-      #   }.gsub(/\n\s*/, ' ')
-
-      #   course_client_states = CourseClientState.find_by_sql(sql_find_and_lock_course_client_states)
-      #   puts "#{Time.now.utc.iso8601(6)} #{course_client_states.count} courses need attention from client #{@client_name} #{protocol.modulo} #{@client_uuid}"
-      #   next 0 if course_client_states.none?
-
-      #   course_client_states.each{|state| puts "#{Time.now.utc.iso8601(6)}   #{state.course_uuid} #{state.waiting_since.iso8601(6)}"}
-
-      #   ##
-      #   ## For each state (course) of interest, find the next bundle for this client.
-      #   ##
-
-      #   course_uuids       = course_client_states.map(&:course_uuid).sort
-      #   course_uuid_values = course_uuids.map{|uuid| "'#{uuid}'"}.join(',')
-
-      #   sql_find_course_bundles = %Q{
-      #     SELECT * FROM course_bundles
-      #     WHERE uuid IN (
-      #       SELECT xx.uuid FROM (
-      #         SELECT * FROM course_client_states
-      #         WHERE course_uuid IN ( #{course_uuid_values} )
-      #         AND   client_uuid = '#{@client_uuid}'
-      #       ) client_states_oi
-      #       LEFT JOIN LATERAL (
-      #         SELECT * FROM course_bundles
-      #         WHERE course_uuid = client_states_oi.course_uuid
-      #         AND course_event_seqnum_hi > client_states_oi.last_confirmed_course_seqnum
-      #         ORDER BY course_event_seqnum_hi ASC
-      #         LIMIT 2
-      #       ) xx ON TRUE
-      #     )
-      #   }.gsub(/\n\s*/, ' ')
-
-      #   course_bundles = CourseBundle.find_by_sql(sql_find_course_bundles)
-      #   puts "#{Time.now.utc.iso8601(6)} found #{course_bundles.count} bundles for client #{@client_name} #{@client_uuid}"
-
-      #   num_processed_events = 0
-      #   if course_bundles.any?
-      #     ##
-      #     ## Find the events associated with the bundles.
-      #     ##
-
-      #     bundle_uuids       = course_bundles.map(&:uuid).sort
-      #     bundle_uuid_values = bundle_uuids.map{|uuid| "'#{uuid}'"}.join(',')
-
-      #     sql_find_course_events = %Q{
-      #       SELECT * FROM course_events
-      #       WHERE event_uuid IN (
-      #         SELECT course_event_uuid FROM course_bundle_entries
-      #         WHERE course_bundle_uuid in ( #{bundle_uuid_values} )
-      #       )
-      #     }.gsub(/\n\s*/, ' ')
-
-      #     course_events = CourseEvent.find_by_sql(sql_find_course_events)
-      #                                .select{ |event|
-      #                                  last_confirmed_course_seqnum = course_client_states.detect{|state| state.course_uuid == event.course_uuid}.last_confirmed_course_seqnum
-      #                                  event.course_seqnum > last_confirmed_course_seqnum
-      #                                 }
-
-      #     puts "#{Time.now.utc.iso8601(6)} found #{course_events.count} course events"
-
-      #     now = Time.now
-
-      #     course_events.group_by{ |event|
-      #       event.course_uuid
-      #     }.each{ |course_uuid, events|
-      #       puts "events for course #{course_uuid}:"
-      #       events.each{|ee| puts "  #{ee.event_uuid} #{ee.course_seqnum} #{ee.created_at.iso8601(6)} #{now.iso8601(6)} #{now - ee.created_at}"}
-      #     }
-
-      #     delays = course_events.group_by{ |event|
-      #       event.course_uuid
-      #     }.map{ |course_uuid, events|
-      #       dels = events.map(&:created_at).map{|ca| now - ca}
-      #       [dels.min, dels.max]
-      #     }
-      #     min_delay = delays.map{|dd| dd[0]}.min
-      #     max_delay = delays.map{|dd| dd[1]}.max
-      #     puts "#{Time.now.utc.iso8601(6)} min,max delay = %+1.3e,%1.3e" % [min_delay, max_delay]
-
-      #     num_processed_events = course_events.count
-      #   end
-
-      #   puts "#{Time.now.utc.iso8601(6)} finished processing course bundles"
-
-      #   ##
-      #   ## Update client states.
-      #   ##
-
-      #   course_client_states.each do |client_state|
-      #     puts "#{Time.now.utc.iso8601(6)} updating client state for course #{client_state.course_uuid}"
-
-      #     bundles = course_bundles.select{|bundle| bundle.course_uuid == client_state.course_uuid}
-      #                             .sort_by{|bundle| bundle.course_event_seqnum_hi}
-
-      #     puts "#{Time.now.utc.iso8601(6)}   #{bundles.count} bundles"
-
-      #     client_state.waiting_since   = current_time
-      #     client_state.needs_attention = (bundles.count > 1) ## FOR DEMO PURPOSES ONLY
-      #     if bundles.any?
-      #       puts "#{Time.now.utc.iso8601(6)}   bundles[0] course_event_seqnum_hi = #{bundles[0].course_event_seqnum_hi}"
-      #       client_state.last_confirmed_course_seqnum = bundles[0].course_event_seqnum_hi ## FOR DEMO PURPOSES ONLY
-      #     end
-      #   end
-
-      #   CourseClientState.import(
-      #     course_client_states,
-      #     on_duplicate_key_update: {
-      #       conflict_target: [:course_uuid, :client_uuid],
-      #       columns:         CourseClientState.column_names - ['updated_at', 'created_at']
-      #     }
-      #   )
-
-      #   puts "#{Time.now.utc.iso8601(6)} finished processing client states"
-
-      #   num_processed_events
-      # end
     end
 
     def do_boss(protocol:)
