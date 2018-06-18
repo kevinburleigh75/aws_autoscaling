@@ -401,8 +401,6 @@ module Event
       start = Time.now
 
       num_processed_events = CourseEvent.transaction(isolation: :read_committed) do
-        puts "#{Time.now.utc.iso8601(6)} A"
-
         ##
         ## Lock the buckets handled by this worker.
         ##
@@ -490,8 +488,6 @@ module Event
         ## Update the FetchCourseStates
         ##
 
-        puts "#{Time.now.utc.iso8601(6)} B"
-
         fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
                                               .lock
                                               .to_a
@@ -504,7 +500,6 @@ module Event
 
           fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
         end
-        puts "#{Time.now.utc.iso8601(6)} C"
 
         if fetch_course_states.any?
           FetchCourseState.import(
@@ -516,15 +511,13 @@ module Event
           )
         end
 
-        puts "#{Time.now.utc.iso8601(6)} D"
-
         course_events_needing_attention.count
       end
 
       elapsed = Time.now - start
 
-      puts "#{Time.now.utc.iso8601(6)} processed #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
-      Rails.logger.info "   fetch wrote #{num_processed_events} events in #{'%1.3e' % elapsed} sec"
+      puts "#{Time.now.utc.iso8601(6)} processed #{num_processed_events} events in elapsed = #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   fetch wrote #{num_processed_events} events in elapsed = #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(protocol:)
