@@ -198,6 +198,30 @@ module DefinitelyNotBundlerUtils
     end
   end
 
+  def self.confirm_events(confirmations: [])
+    fetch_course_states = FetchCourseState.where(course_uuid: confirmations.keys().sort)
+                                          .order(course_uuid: :asc)
+                                          .lock
+                                          .to_a
+
+    fetch_course_states.each do |fetch_course_state|
+      new_last_confirmed_course_seqnum = confirmations[fetch_course_state.course_uuid]
+      if new_last_confirmed_course_seqnum > fetch_course_state.last_confirmed_course_seqnum
+        fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
+      end
+    end
+
+    if fetch_course_states.any?
+      FetchCourseState.import(
+        fetch_course_states,
+        on_duplicate_key_update: {
+          conflict_target: [:client_uuid, :course_uuid],
+          columns:         FetchCourseState.column_names - ['updated_at', 'created_at']
+        }
+      )
+    end
+  end
+
   def self.fetch_events(instance_modulo:,
                         instance_count:,
                         client_uuid:)
@@ -277,39 +301,6 @@ module DefinitelyNotBundlerUtils
     puts "QUERY 2: #{sql_find_course_events_needing_attention}"
 
     course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
-
-    course_events_by_course_uuid = course_events_needing_attention.group_by{ |event|
-      event.course_uuid
-    }
-
-    course_uuids = course_events_by_course_uuid.keys.sort
-
-    ##
-    ## Update the FetchCourseStates
-    ##
-
-    fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
-                                          .lock
-                                          .to_a
-
-    fetch_course_states.each do |fetch_course_state|
-      new_last_confirmed_course_seqnum = course_events_by_course_uuid[fetch_course_state.course_uuid]
-                                          .sort_by{|event| event.course_seqnum}
-                                          .last
-                                          .course_seqnum
-
-      fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
-    end
-
-    if fetch_course_states.any?
-      FetchCourseState.import(
-        fetch_course_states,
-        on_duplicate_key_update: {
-          conflict_target: [:client_uuid, :course_uuid],
-          columns:         FetchCourseState.column_names - ['updated_at', 'created_at']
-        }
-      )
-    end
 
     return course_events_needing_attention
   end
@@ -494,7 +485,8 @@ module Event
       @group_uuid  = group_uuid
       @client_name = client_name
 
-      @client_uuid = nil
+      @client_uuid   = nil
+      @confirmations = {}
 
       @counter = 0
     end
@@ -526,20 +518,33 @@ module Event
 
       start = Time.now
 
-      num_processed_events = CourseEvent.transaction(isolation: :read_committed) do
+      CourseEvent.transaction(isolation: :read_committed) do
+        DefinitelyNotBundlerUtils.confirm_events(confirmations: @confirmations)
+      end
+
+      events = CourseEvent.transaction(isolation: :read_committed) do
         events = DefinitelyNotBundlerUtils.fetch_events(
           instance_modulo: protocol.modulo,
           instance_count:  protocol.count,
           client_uuid:     @client_uuid,
         )
 
-        events.count
+        events
       end
+
+      events_by_course_uuid = events.group_by{ |event|
+        event.course_uuid
+      }
+
+      @confirmations = events_by_course_uuid.inject({}) { |result, (course_uuid, events)|
+        result[course_uuid] = events.sort_by{|event| event.course_seqnum}.last.course_seqnum
+        result
+      }
 
       elapsed = Time.now - start
 
-      puts "#{Time.now.utc.iso8601(6)} processed #{num_processed_events} events in elapsed = #{'%1.3e' % elapsed} sec"
-      Rails.logger.info "   fetch wrote #{num_processed_events} events in elapsed = #{'%1.3e' % elapsed} sec"
+      puts "#{Time.now.utc.iso8601(6)} processed #{events.count} events in elapsed = #{'%1.3e' % elapsed} sec"
+      Rails.logger.info "   fetch wrote #{events.count} events in elapsed = #{'%1.3e' % elapsed} sec"
     end
 
     def do_boss(protocol:)
