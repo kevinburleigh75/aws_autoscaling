@@ -1,3 +1,320 @@
+module DefinitelyNotBundlerUtils
+  def self.record_events(course_events:)
+    CourseEvent.import(
+      course_events,
+      on_duplicate_key_ignore: true,
+    )
+  end
+
+  def self.bundle_events(instance_modulo:,
+                         instance_count:,
+                         max_bundle_size:,
+                         max_bundle_events:)
+    ##
+    ## Lock the buckets handled by this worker.
+    ##
+
+    bucket_lo = (Rational(100) / instance_count * instance_modulo).floor
+    bucket_hi = (Rational(100) / instance_count * (instance_modulo+1)).floor - 1
+
+    sql_find_and_lock_bundle_buckets = %Q{
+      SELECT 1 FROM bundle_buckets
+      WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+      ORDER BY bucket_num
+      FOR UPDATE
+    }.gsub(/\n\s*/, ' ')
+
+    ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
+
+    ##
+    ## Find relavent events that are bundle-able.
+    ##
+
+    sql_find_course_uuids_needing_attention = %Q{
+      SELECT DISTINCT course_uuid FROM course_events
+      WHERE event_uuid IN
+      ( SELECT xx.event_uuid FROM
+        ( SELECT yy.created_at,yy.event_uuid,bcbs.bucket_num FROM
+          ( SELECT * FROM course_events
+            WHERE bundle_uuid IS NULL
+          ) AS yy
+          INNER JOIN
+          bundle_course_states as bces
+          ON  yy.course_uuid   = bces.course_uuid
+          AND yy.course_seqnum = bces.last_bundled_seqnum + 1
+          INNER JOIN
+          bundle_course_buckets as bcbs
+          ON yy.course_uuid = bcbs.course_uuid
+        ) AS xx
+        WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+        ORDER BY xx.created_at ASC
+        LIMIT 50
+      )
+    }.gsub(/\n\s*/, ' ')
+
+    puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
+
+    course_uuids_needing_attention = CourseEvent.find_by_sql(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
+    return if course_uuids_needing_attention.none?
+
+    course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
+
+    sql_find_course_events_needing_attention = %Q{
+      SELECT * FROM course_events
+      WHERE event_uuid IN
+      ( SELECT xx.event_uuid FROM
+        ( ( SELECT * FROM course_events
+            WHERE bundle_uuid IS NULL
+            AND   course_uuid IN ( #{course_uuid_values} )
+          ) AS yy
+          INNER JOIN
+          bundle_course_states as bces
+          ON  yy.course_uuid   = bces.course_uuid
+          AND yy.course_seqnum BETWEEN bces.last_bundled_seqnum + 1 AND bces.last_bundled_seqnum + 10
+        ) AS xx
+      )
+      ORDER BY event_uuid
+      FOR UPDATE
+    }.gsub(/\n\s*/, ' ')
+
+    # puts "QUERY 2: #{sql_find_course_events_needing_attention}"
+
+    course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
+
+
+    events_by_course_uuid = course_events_needing_attention.sort_by{ |event|
+                                                              [event.course_uuid, event.course_seqnum]
+                                                            }.group_by{ |event|
+                                                              event.course_uuid
+                                                            }
+
+    events_by_course_uuid.map do |course_uuid, course_events|
+      index = course_events.map(&:course_seqnum)
+                           .each_cons(2)
+                           .find_index{|cons| cons[1] - cons[0] != 1}
+      unless index.nil?
+        course_events[0..-1] = course_events.slice(0,1+index)
+      end
+    end
+
+    puts "#{course_events_needing_attention.count} events need attention in buckets #{bucket_lo} - #{bucket_hi}"
+
+    sql_find_and_lock_bundle_course_states = %Q{
+      SELECT * FROM bundle_course_states
+      WHERE course_uuid IN ( #{course_uuid_values} )
+      ORDER BY course_uuid ASC
+      FOR UPDATE
+    }.gsub(/\n\s*/, ' ')
+
+    bundle_course_states = BundleCourseState.find_by_sql(sql_find_and_lock_bundle_course_states)
+
+    bundle_course_states.each do |state|
+      state.last_bundled_seqnum += events_by_course_uuid[state.course_uuid].count
+    end
+
+    sql_find_and_lock_course_bundles = %Q{
+      SELECT * FROM course_bundles
+      WHERE is_open = TRUE
+      AND course_uuid IN ( #{course_uuid_values} )
+      ORDER BY uuid ASC
+      FOR UPDATE
+    }.gsub(/\n\s*/, ' ')
+
+    existing_course_bundles = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
+    bundle_by_course_uuid = existing_course_bundles.inject({}){ |result, bundle|
+      result[bundle.course_uuid] = bundle
+      result
+    }
+
+    course_bundles_to_create = []
+    bundle_entries_to_create = []
+
+    events_by_course_uuid.each do |target_course_uuid, target_course_events|
+      target_course_events.each do |target_course_event|
+        target_course_uuid = target_course_event.course_uuid
+        target_event_size  = Event::event_data_by_type[target_course_event.event_type.to_sym][:size]
+
+        if bundle_by_course_uuid[target_course_uuid] &&
+           ( (bundle_by_course_uuid[target_course_uuid].size + target_event_size > max_bundle_size) ||
+             (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= max_bundle_events) )
+          bundle_by_course_uuid[target_course_uuid].is_open = false
+          bundle_by_course_uuid[target_course_uuid]         = nil
+        end
+
+        if bundle_by_course_uuid[target_course_uuid].nil?
+          puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
+          bundle_by_course_uuid[target_course_uuid] = CourseBundle.new(
+            uuid:                   SecureRandom.uuid.to_s,
+            course_uuid:            target_course_event.course_uuid,
+            course_event_seqnum_lo: target_course_event.course_seqnum,
+            course_event_seqnum_hi: target_course_event.course_seqnum,
+            size:                   target_event_size,
+            is_open:                true,
+            has_been_processed:     false,
+            waiting_since:          Time.now,
+          )
+          course_bundles_to_create << bundle_by_course_uuid[target_course_uuid]
+        else
+          bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi  = target_course_event.course_seqnum
+          bundle_by_course_uuid[target_course_uuid].size                   += target_event_size
+        end
+
+        target_course_event.bundle_uuid = bundle_by_course_uuid[target_course_uuid].uuid
+
+        if ( (bundle_by_course_uuid[target_course_uuid].size >= max_bundle_size) ||
+             (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= max_bundle_events) )
+          bundle_by_course_uuid[target_course_uuid].is_open = false
+        end
+
+        bundle_by_course_uuid[target_course_uuid].has_been_processed = false
+        bundle_by_course_uuid[target_course_uuid].waiting_since      = Time.now
+      end
+    end
+
+    if course_events_needing_attention.any?
+      CourseEvent.import(
+        course_events_needing_attention,
+        on_duplicate_key_update: {
+          conflict_target:  [:event_uuid],
+          columns:          CourseEvent.column_names - ['updated_at', 'created_at']
+        }
+      )
+
+      BundleCourseState.import(
+        bundle_course_states.to_a,
+        on_duplicate_key_update: {
+          conflict_target:  [:course_uuid],
+          columns:          BundleCourseState.column_names - ['updated_at', 'created_at']
+        }
+      )
+
+      CourseBundle.import(
+        existing_course_bundles + course_bundles_to_create,
+        on_duplicate_key_update: {
+          conflict_target: [:uuid],
+          columns:         CourseBundle.column_names - ['updated_at', 'created_at']
+        }
+      )
+    end
+  end
+
+  def self.fetch_events(instance_modulo:,
+                        instance_count:,
+                        client_uuid:)
+    ##
+    ## Lock the buckets handled by this worker.
+    ##
+
+    bucket_lo = (Rational(100) / instance_count * instance_modulo).floor
+    bucket_hi = (Rational(100) / instance_count * (instance_modulo+1)).floor - 1
+
+    sql_find_and_lock_fetch_buckets = %Q{
+      SELECT 1 FROM fetch_buckets
+      WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+      ORDER BY bucket_num
+      FOR UPDATE
+    }.gsub(/\n\s*/, ' ')
+
+    ActiveRecord::Base.connection.execute(sql_find_and_lock_fetch_buckets)
+
+    ##
+    ## Find courses with new events for this client.
+    ##
+
+    sql_find_course_uuids_needing_attention = %Q{
+      SELECT t2.course_uuid FROM
+      ( SELECT * FROM
+        ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,fcss.waiting_since,fcbs.bucket_num FROM
+          fetch_course_states AS fcss
+          INNER JOIN fetch_course_buckets AS fcbs
+          ON fcss.course_uuid = fcbs.course_uuid
+          WHERE fcss.client_uuid = '#{client_uuid}'
+        ) AS t1
+        WHERE t1.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
+      ) AS t2
+      INNER JOIN bundle_course_states AS bcss
+      ON t2.course_uuid = bcss.course_uuid
+      WHERE t2.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
+      ORDER BY waiting_since ASC
+      LIMIT 50
+    }.gsub(/\n\s*/, ' ')
+
+    puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
+
+    course_uuids_needing_attention = ActiveRecord::Base.connection.execute(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
+    return [] if course_uuids_needing_attention.none?
+
+    course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
+
+    ##
+    ## Find the CourseEvents needing attention from this client.
+    ##
+
+    sql_find_course_events_needing_attention = %Q{
+      SELECT * FROM course_events
+      WHERE event_uuid IN
+      ( SELECT t2.event_uuid FROM
+        ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,bcss.last_bundled_seqnum
+          FROM fetch_course_states AS fcss
+          INNER JOIN bundle_course_states AS bcss
+          ON fcss.course_uuid = bcss.course_uuid
+          WHERE fcss.client_uuid = '#{client_uuid}'
+          AND   fcss.course_uuid IN ( #{course_uuid_values} )
+          AND   fcss.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
+        ) AS t1
+        INNER JOIN LATERAL
+        ( SELECT *
+          FROM course_events AS ces
+          WHERE ces.course_uuid = t1.course_uuid
+          AND   ces.course_seqnum BETWEEN t1.last_confirmed_course_seqnum + 1
+                                  AND LEAST(t1.last_confirmed_course_seqnum + 10, t1.last_bundled_seqnum)
+          LIMIT 10
+        ) AS t2
+        ON TRUE
+      )
+    }.gsub(/\n\s*/, ' ')
+
+    puts "QUERY 2: #{sql_find_course_events_needing_attention}"
+
+    course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
+
+    course_events_by_course_uuid = course_events_needing_attention.group_by{ |event|
+      event.course_uuid
+    }
+
+    course_uuids = course_events_by_course_uuid.keys.sort
+
+    ##
+    ## Update the FetchCourseStates
+    ##
+
+    fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
+                                          .lock
+                                          .to_a
+
+    fetch_course_states.each do |fetch_course_state|
+      new_last_confirmed_course_seqnum = course_events_by_course_uuid[fetch_course_state.course_uuid]
+                                          .sort_by{|event| event.course_seqnum}
+                                          .last
+                                          .course_seqnum
+
+      fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
+    end
+
+    if fetch_course_states.any?
+      FetchCourseState.import(
+        fetch_course_states,
+        on_duplicate_key_update: {
+          conflict_target: [:client_uuid, :course_uuid],
+          columns:         FetchCourseState.column_names - ['updated_at', 'created_at']
+        }
+      )
+    end
+
+    return course_events_needing_attention
+  end
+end
+
 module Event
   @@event_data_by_type = {
     'Response': {
@@ -106,7 +423,8 @@ module Event
           tcem.last_created_course_seqnum += 1
         end
 
-        CourseEvent.import course_events
+        # CourseEvent.import course_events
+        DefinitelyNotBundlerUtils.record_events(course_events: course_events)
 
         TempCourseEventMetadata.import(
           temp_course_event_metadatas,
@@ -151,204 +469,12 @@ module Event
 
       puts "#{Time.now.utc.iso8601(6)} start of transaction"
       course_events_size = CourseEvent.transaction(isolation: :read_committed) do
-        ##
-        ## Lock the buckets handled by this worker.
-        ##
-
-        bucket_lo = (Rational(100) / protocol.count * protocol.modulo).floor
-        bucket_hi = (Rational(100) / protocol.count * (protocol.modulo+1)).floor - 1
-
-        sql_find_and_lock_bundle_buckets = %Q{
-          SELECT 1 FROM bundle_buckets
-          WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-          ORDER BY bucket_num
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        ActiveRecord::Base.connection.execute(sql_find_and_lock_bundle_buckets)
-
-        ##
-        ## Find relavent events that are bundle-able.
-        ##
-
-        sql_find_course_uuids_needing_attention = %Q{
-          SELECT DISTINCT course_uuid FROM course_events
-          WHERE event_uuid IN
-          ( SELECT xx.event_uuid FROM
-            ( SELECT yy.created_at,yy.event_uuid,bcbs.bucket_num FROM
-              ( SELECT * FROM course_events
-                WHERE bundle_uuid IS NULL
-              ) AS yy
-              INNER JOIN
-              bundle_course_states as bces
-              ON  yy.course_uuid   = bces.course_uuid
-              AND yy.course_seqnum = bces.last_bundled_seqnum + 1
-              INNER JOIN
-              bundle_course_buckets as bcbs
-              ON yy.course_uuid = bcbs.course_uuid
-            ) AS xx
-            WHERE xx.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-            ORDER BY xx.created_at ASC
-            LIMIT 50
-          )
-        }.gsub(/\n\s*/, ' ')
-
-        puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
-
-        course_uuids_needing_attention = CourseEvent.find_by_sql(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
-        break if course_uuids_needing_attention.none?
-
-        course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
-
-        sql_find_course_events_needing_attention = %Q{
-          SELECT * FROM course_events
-          WHERE event_uuid IN
-          ( SELECT xx.event_uuid FROM
-            ( ( SELECT * FROM course_events
-                WHERE bundle_uuid IS NULL
-                AND   course_uuid IN ( #{course_uuid_values} )
-              ) AS yy
-              INNER JOIN
-              bundle_course_states as bces
-              ON  yy.course_uuid   = bces.course_uuid
-              AND yy.course_seqnum BETWEEN bces.last_bundled_seqnum + 1 AND bces.last_bundled_seqnum + 10
-            ) AS xx
-          )
-          ORDER BY event_uuid
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        # puts "QUERY 2: #{sql_find_course_events_needing_attention}"
-
-        course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
-
-
-        events_by_course_uuid = course_events_needing_attention.sort_by{ |event|
-                                                                  [event.course_uuid, event.course_seqnum]
-                                                                  }.group_by{ |event|
-                                                                    event.course_uuid
-                                                                  }
-
-        # puts "events_by_course_uuid (pre-slice):"
-        # events_by_course_uuid.keys.sort.each{|course_uuid|
-        #   puts "   #{course_uuid}: #{events_by_course_uuid[course_uuid].map{|event| [event.course_seqnum, event.event_uuid]}.sort}"
-        # }
-
-        events_by_course_uuid.map do |course_uuid, course_events|
-          index = course_events.map(&:course_seqnum)
-                               .each_cons(2)
-                               .find_index{|cons| cons[1] - cons[0] != 1}
-          # puts "index = #{index}"
-          unless index.nil?
-            course_events[0..-1] = course_events.slice(0,1+index)
-          end
-        end
-
-        # puts "events_by_course_uuid (post-slice):"
-        # events_by_course_uuid.keys.sort.each{|course_uuid|
-        #   puts "   #{course_uuid}: #{events_by_course_uuid[course_uuid].map{|event| [event.course_seqnum, event.event_uuid]}.sort}"
-        # }
-
-        puts "#{course_events_needing_attention.count} events need attention in buckets #{bucket_lo} - #{bucket_hi}"
-
-        sql_find_and_lock_bundle_course_states = %Q{
-          SELECT * FROM bundle_course_states
-          WHERE course_uuid IN ( #{course_uuid_values} )
-          ORDER BY course_uuid ASC
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        bundle_course_states = BundleCourseState.find_by_sql(sql_find_and_lock_bundle_course_states)
-
-        bundle_course_states.each do |state|
-          state.last_bundled_seqnum += events_by_course_uuid[state.course_uuid].count
-        end
-
-        sql_find_and_lock_course_bundles = %Q{
-          SELECT * FROM course_bundles
-          WHERE is_open = TRUE
-          AND course_uuid IN ( #{course_uuid_values} )
-          ORDER BY uuid ASC
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        existing_course_bundles = CourseBundle.find_by_sql(sql_find_and_lock_course_bundles)
-        bundle_by_course_uuid = existing_course_bundles.inject({}){ |result, bundle|
-          result[bundle.course_uuid] = bundle
-          result
-        }
-
-        course_bundles_to_create = []
-        bundle_entries_to_create = []
-
-        events_by_course_uuid.each do |target_course_uuid, target_course_events|
-          target_course_events.each do |target_course_event|
-            target_course_uuid = target_course_event.course_uuid
-            target_event_size  = Event::event_data_by_type[target_course_event.event_type.to_sym][:size]
-
-            if bundle_by_course_uuid[target_course_uuid] &&
-               ( (bundle_by_course_uuid[target_course_uuid].size + target_event_size > @max_bundle_size) ||
-                 (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= @max_bundle_events) )
-              bundle_by_course_uuid[target_course_uuid].is_open = false
-              bundle_by_course_uuid[target_course_uuid]         = nil
-            end
-
-            if bundle_by_course_uuid[target_course_uuid].nil?
-              puts "#{Time.now.utc.iso8601(6)}      adding to new bundle"
-              bundle_by_course_uuid[target_course_uuid] = CourseBundle.new(
-                uuid:                   SecureRandom.uuid.to_s,
-                course_uuid:            target_course_event.course_uuid,
-                course_event_seqnum_lo: target_course_event.course_seqnum,
-                course_event_seqnum_hi: target_course_event.course_seqnum,
-                size:                   target_event_size,
-                is_open:                true,
-                has_been_processed:     false,
-                waiting_since:          Time.now,
-              )
-              course_bundles_to_create << bundle_by_course_uuid[target_course_uuid]
-            else
-              # puts "#{Time.now.utc.iso8601(6)}      adding to existing bundle"
-              bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi  = target_course_event.course_seqnum
-              bundle_by_course_uuid[target_course_uuid].size                   += target_event_size
-            end
-
-            target_course_event.bundle_uuid = bundle_by_course_uuid[target_course_uuid].uuid
-
-            if ( (bundle_by_course_uuid[target_course_uuid].size >= @max_bundle_size) ||
-                 (bundle_by_course_uuid[target_course_uuid].course_event_seqnum_hi - bundle_by_course_uuid[target_course_uuid].course_event_seqnum_lo + 1 >= @max_bundle_events) )
-              bundle_by_course_uuid[target_course_uuid].is_open = false
-            end
-
-            bundle_by_course_uuid[target_course_uuid].has_been_processed = false
-            bundle_by_course_uuid[target_course_uuid].waiting_since      = Time.now
-          end
-        end
-
-        if course_events_needing_attention.any?
-          CourseEvent.import(
-            course_events_needing_attention,
-            on_duplicate_key_update: {
-              conflict_target:  [:event_uuid],
-              columns:          CourseEvent.column_names - ['updated_at', 'created_at']
-            }
-          )
-
-          BundleCourseState.import(
-            bundle_course_states.to_a,
-            on_duplicate_key_update: {
-              conflict_target:  [:course_uuid],
-              columns:          BundleCourseState.column_names - ['updated_at', 'created_at']
-            }
-          )
-
-          CourseBundle.import(
-            existing_course_bundles + course_bundles_to_create,
-            on_duplicate_key_update: {
-              conflict_target: [:uuid],
-              columns:         CourseBundle.column_names - ['updated_at', 'created_at']
-            }
-          )
-        end
+        DefinitelyNotBundlerUtils.bundle_events(
+          instance_modulo:   protocol.modulo,
+          instance_count:    protocol.count,
+          max_bundle_size:   @max_bundle_size,
+          max_bundle_events: @max_bundle_events,
+        )
       end
 
       elapsed = Time.now - start
@@ -401,117 +527,13 @@ module Event
       start = Time.now
 
       num_processed_events = CourseEvent.transaction(isolation: :read_committed) do
-        ##
-        ## Lock the buckets handled by this worker.
-        ##
+        events = DefinitelyNotBundlerUtils.fetch_events(
+          instance_modulo: protocol.modulo,
+          instance_count:  protocol.count,
+          client_uuid:     @client_uuid,
+        )
 
-        bucket_lo = (Rational(100) / protocol.count * protocol.modulo).floor
-        bucket_hi = (Rational(100) / protocol.count * (protocol.modulo+1)).floor - 1
-
-        sql_find_and_lock_fetch_buckets = %Q{
-          SELECT 1 FROM fetch_buckets
-          WHERE bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-          ORDER BY bucket_num
-          FOR UPDATE
-        }.gsub(/\n\s*/, ' ')
-
-        ActiveRecord::Base.connection.execute(sql_find_and_lock_fetch_buckets)
-
-        ##
-        ## Find courses with new events for this client.
-        ##
-
-        sql_find_course_uuids_needing_attention = %Q{
-          SELECT t2.course_uuid FROM
-          ( SELECT * FROM
-            ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,fcss.waiting_since,fcbs.bucket_num FROM
-              fetch_course_states AS fcss
-              INNER JOIN fetch_course_buckets AS fcbs
-              ON fcss.course_uuid = fcbs.course_uuid
-              WHERE fcss.client_uuid = '#{@client_uuid}'
-            ) AS t1
-            WHERE t1.bucket_num BETWEEN #{bucket_lo} AND #{bucket_hi}
-          ) AS t2
-          INNER JOIN bundle_course_states AS bcss
-          ON t2.course_uuid = bcss.course_uuid
-          WHERE t2.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
-          ORDER BY waiting_since ASC
-          LIMIT 50
-        }.gsub(/\n\s*/, ' ')
-
-        puts "QUERY 1: #{sql_find_course_uuids_needing_attention}"
-
-        course_uuids_needing_attention = ActiveRecord::Base.connection.execute(sql_find_course_uuids_needing_attention).map{|row| row['course_uuid']}
-        break 0 if course_uuids_needing_attention.none?
-
-        course_uuid_values = course_uuids_needing_attention.map{|uuid| "'#{uuid}'"}.join(',')
-
-        ##
-        ## Find the CourseEvents needing attention from this client.
-        ##
-
-        sql_find_course_events_needing_attention = %Q{
-          SELECT * FROM course_events
-          WHERE event_uuid IN
-          ( SELECT t2.event_uuid FROM
-            ( SELECT fcss.course_uuid,fcss.last_confirmed_course_seqnum,bcss.last_bundled_seqnum
-              FROM fetch_course_states AS fcss
-              INNER JOIN bundle_course_states AS bcss
-              ON fcss.course_uuid = bcss.course_uuid
-              WHERE fcss.client_uuid = '#{@client_uuid}'
-              AND   fcss.course_uuid IN ( #{course_uuid_values} )
-              AND   fcss.last_confirmed_course_seqnum < bcss.last_bundled_seqnum
-            ) AS t1
-            INNER JOIN LATERAL
-            ( SELECT *
-              FROM course_events AS ces
-              WHERE ces.course_uuid = t1.course_uuid
-              AND   ces.course_seqnum BETWEEN t1.last_confirmed_course_seqnum + 1
-                                      AND LEAST(t1.last_confirmed_course_seqnum + 10, t1.last_bundled_seqnum)
-              LIMIT 10
-            ) AS t2
-            ON TRUE
-          )
-        }.gsub(/\n\s*/, ' ')
-
-        puts "QUERY 2: #{sql_find_course_events_needing_attention}"
-
-        course_events_needing_attention = CourseEvent.find_by_sql(sql_find_course_events_needing_attention)
-
-        course_events_by_course_uuid = course_events_needing_attention.group_by{ |event|
-          event.course_uuid
-        }
-
-        course_uuids = course_events_by_course_uuid.keys.sort
-
-        ##
-        ## Update the FetchCourseStates
-        ##
-
-        fetch_course_states = FetchCourseState.where(course_uuid: course_uuids_needing_attention)
-                                              .lock
-                                              .to_a
-
-        fetch_course_states.each do |fetch_course_state|
-          new_last_confirmed_course_seqnum = course_events_by_course_uuid[fetch_course_state.course_uuid]
-                                              .sort_by{|event| event.course_seqnum}
-                                              .last
-                                              .course_seqnum
-
-          fetch_course_state.last_confirmed_course_seqnum = new_last_confirmed_course_seqnum
-        end
-
-        if fetch_course_states.any?
-          FetchCourseState.import(
-            fetch_course_states,
-            on_duplicate_key_update: {
-              conflict_target: [:client_uuid, :course_uuid],
-              columns:         FetchCourseState.column_names - ['updated_at', 'created_at']
-            }
-          )
-        end
-
-        course_events_needing_attention.count
+        events.count
       end
 
       elapsed = Time.now - start
