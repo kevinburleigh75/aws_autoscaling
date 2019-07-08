@@ -43,6 +43,7 @@ namespace :protocol do
       timing_modulo:       timing_modulo,
       timing_offset:       timing_offset,
       dead_record_timeout: 10.0.seconds,
+      min_wake_interval:   1.0.seconds,
       reference_time:      Chronic.parse('Jan 1, 2010 13:00:00'),
       work_block: lambda { |protocol:|
                     worker.do_work(protocol: protocol)
