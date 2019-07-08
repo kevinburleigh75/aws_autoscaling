@@ -109,9 +109,14 @@
     end
 
     def self.update_boss_vote(instance_record:, live_records:)
-      lowest_uuid = live_records.map(&:instance_uuid).sort.first
-      instance_record.boss_uuid      = lowest_uuid
-      instance_record.instance_count = live_records.count
+      if live_records.any?
+        lowest_uuid = live_records.map(&:instance_uuid).sort.first
+        instance_record.boss_uuid      = lowest_uuid
+        instance_record.instance_count = live_records.count
+      else
+        instance_record.boss_uuid      = instance_record.instance_uuid
+        instance_record.instance_count = 1
+      end
       self.save_record(record: instance_record)
     end
 

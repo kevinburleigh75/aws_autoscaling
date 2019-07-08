@@ -47,4 +47,19 @@ RSpec.describe 'Protocol::Helpers.update_boss_vote' do
     expect(updated_records.first.id).to eq(target_instance_record.id)
     expect(updated_records.first.instance_count).to eq(4)
   end
+
+  context 'when the instance record is dead' do
+    let!(:live_records) {[]}
+    let(:target_instance_record) {
+      build(:protocol_record,
+        group_uuid: target_group_uuid, instance_modulo: 0, boss_uuid: non_boss_uuid_2, instance_uuid: target_instance_uuid, instance_count: 1,
+      )
+    }
+
+    it 'does not explode' do
+      expect(updated_records.count).to eq(1)
+      expect(updated_records.first.id).to eq(target_instance_record.id)
+      expect(updated_records.first.instance_count).to eq(1)
+    end
+  end
 end
